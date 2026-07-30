@@ -1,0 +1,6 @@
+{
+  "name": "CADMNAnimat",
+  "description": "Browser-based 3D parametric CAD modeling software with 2D sketching, parametric feature tree, extrusion/revolve/loft tools, measurement caliper, and export capabilities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
