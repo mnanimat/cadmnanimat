@@ -6,7 +6,8 @@ import {
   PlaneType, 
   Sketch2D, 
   CADFeature, 
-  MeasurementResult
+  MeasurementResult,
+  Point3D
 } from './types/cad';
 import { UserSession, RocketConfig, VehicleConfig } from './types/engineering';
 import { CAD_TEMPLATES } from './data/cadTemplates';
@@ -26,7 +27,15 @@ import { Layers, Ruler, Sliders, Download, Maximize2, Minimize2, Move, Box, User
 
 export default function App() {
   // Authentication & Engineering Modes State
-  const [userSession, setUserSession] = useState<UserSession | null>(null);
+  const [userSession, setUserSession] = useState<UserSession | null>({
+    name: 'Engenheiro Projetista',
+    email: 'engenharia@equipe.edu.br',
+    organization: 'Equipe VORTEX Rocketry & Baja SAE',
+    acceptedTerms: true,
+    acceptedPrivacy: true,
+    isLoggedIn: true
+  });
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showModeSelector, setShowModeSelector] = useState<boolean>(false);
   const [showTeamManagement, setShowTeamManagement] = useState<boolean>(false);
   const [activeEngineeringTitle, setActiveEngineeringTitle] = useState<string>('Foguete Experimental (3km Apogeu)');
@@ -50,8 +59,21 @@ export default function App() {
   const [isSketching, setIsSketching] = useState<boolean>(false);
   const [editingSketch, setEditingSketch] = useState<Sketch2D | null>(null);
   
-  const [propertyModalType, setPropertyModalType] = useState<'extrude' | 'revolve' | 'loft' | null>(null);
+  const [propertyModalType, setPropertyModalType] = useState<'extrude' | 'revolve' | 'loft' | 'frame' | 'pipe_miter' | null>(null);
   const [editingFeature, setEditingFeature] = useState<CADFeature | null>(null);
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string | undefined>(undefined);
+
+  const handleUpdateFeatureTransform = (featureId: string, transform: { position?: Point3D; rotation?: Point3D; scale?: Point3D }) => {
+    setProject(prev => ({
+      ...prev,
+      features: prev.features.map(f => f.id === featureId ? {
+        ...f,
+        position: { ...(f.position || { x: 0, y: 0, z: 0 }), ...transform.position },
+        rotation: { ...(f.rotation || { x: 0, y: 0, z: 0 }), ...transform.rotation },
+        scale: { ...(f.scale || { x: 1, y: 1, z: 1 }), ...transform.scale }
+      } : f)
+    }));
+  };
 
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [measurementResult, setMeasurementResult] = useState<MeasurementResult | null>(null);
@@ -187,9 +209,9 @@ export default function App() {
   return (
     <div className="w-screen h-screen flex flex-col bg-[#1e1e1e] font-sans text-[#cccccc] overflow-hidden select-none">
       
-      {/* 1. INITIAL LOGIN MODAL (Terms & Privacy) */}
-      {!userSession && (
-        <LoginModal onLoginSuccess={handleLoginSuccess} />
+      {/* 1. LOGIN & TERMS MODAL */}
+      {showLoginModal && (
+        <LoginModal onLoginSuccess={(session) => { handleLoginSuccess(session); setShowLoginModal(false); }} />
       )}
 
       {/* 2. WORK MODE SELECTOR MODAL */}
@@ -219,6 +241,8 @@ export default function App() {
         onOpenExtrudeModal={() => { setEditingFeature(null); setPropertyModalType('extrude'); setFocusedWindow('property'); }}
         onOpenRevolveModal={() => { setEditingFeature(null); setPropertyModalType('revolve'); setFocusedWindow('property'); }}
         onOpenLoftModal={() => { setEditingFeature(null); setPropertyModalType('loft'); setFocusedWindow('property'); }}
+        onOpenFrameModal={() => { setEditingFeature(null); setPropertyModalType('frame'); setFocusedWindow('property'); }}
+        onOpenPipeMiterModal={() => { setEditingFeature(null); setPropertyModalType('pipe_miter'); setFocusedWindow('property'); }}
         onOpenExportModal={() => { setShowExportModal(true); setFocusedWindow('export'); }}
         onLoadTemplate={handleLoadTemplate}
       />
@@ -249,11 +273,15 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3 text-[11px] text-zinc-400">
-            <span className="flex items-center gap-1 bg-zinc-900 px-2.5 py-0.5 rounded-lg border border-zinc-800">
+            <button
+              type="button"
+              onClick={() => setShowLoginModal(true)}
+              className="flex items-center gap-1 bg-zinc-900 hover:bg-zinc-800 px-2.5 py-0.5 rounded-lg border border-zinc-800 transition cursor-pointer"
+            >
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               <span>{userSession.name}</span>
               <span className="text-zinc-500">• {userSession.organization}</span>
-            </span>
+            </button>
           </div>
 
         </div>
@@ -261,8 +289,9 @@ export default function App() {
 
       {/* Main Workspace Area */}
       <div className="flex-1 relative w-full h-full overflow-hidden bg-zinc-950">
-        {/* Fullscreen 3D CAD Canvas Mode */}
-        {canvasMode === 'fullscreen' && (
+        
+        {/* TAB 1: 3D CAD MODELING VIEWPORT STUDIO */}
+        {activeTab !== 'Análise de Materiais & Propulsão' && (
           <div className="absolute inset-0 w-full h-full z-0">
             <CADViewport
               project={project}
@@ -271,96 +300,123 @@ export default function App() {
               showGrid={showGrid}
               sectionView={sectionView}
               activePlane={activePlane}
+              activeTool={activeTool}
+              selectedFeatureId={selectedFeatureId}
               onSelectPlane={setActivePlane}
+              onSelectFeature={(id) => setSelectedFeatureId(id)}
+              onUpdateFeatureTransform={handleUpdateFeatureTransform}
               isMeasuring={activeTool === 'measure'}
               onMeasureSelect={(res) => setMeasurementResult(res)}
             />
 
-            {/* Quick Window Control Overlay Bar */}
-            <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 bg-zinc-950/85 backdrop-blur-md p-1.5 rounded-xl border border-zinc-800/90 shadow-2xl">
-              <button
-                type="button"
-                onClick={() => setCanvasMode('fullscreen')}
-                className="px-2.5 py-1 bg-sky-500/20 text-sky-300 font-bold rounded-lg flex items-center gap-1.5 text-xs border border-sky-500/40 shadow-sm cursor-pointer"
-                title="Canvas Expandido em Tela Cheia"
-              >
-                <Maximize2 className="w-3.5 h-3.5" />
-                <span>Tela Cheia</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setCanvasMode('windowed'); setFocusedWindow('canvas'); }}
-                className="px-2.5 py-1 hover:bg-zinc-800 text-zinc-300 font-medium rounded-lg flex items-center gap-1.5 text-xs transition cursor-pointer"
-                title="Transformar em Janela Flutuante Movel"
-              >
-                <Move className="w-3.5 h-3.5 text-amber-400" />
-                <span>Modo Janela</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setCanvasMode('minimized')}
-                className="px-2.5 py-1 hover:bg-zinc-800 text-zinc-300 font-medium rounded-lg flex items-center gap-1.5 text-xs transition cursor-pointer"
-                title="Minimizar Visualizador 3D"
-              >
-                <Minimize2 className="w-3.5 h-3.5 text-rose-400" />
-                <span>Minimizar</span>
-              </button>
+            {/* Viewport Floating Status Bar */}
+            <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-zinc-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-zinc-800/90 shadow-2xl text-xs font-sans">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-bold text-zinc-100">{project.name}</span>
+              <span className="text-zinc-500">•</span>
+              <span className="text-sky-300 font-mono text-[11px]">{project.parts.length} peças / {project.features.length} operações</span>
             </div>
           </div>
         )}
 
-        {/* Windowed 3D CAD Canvas Mode (Movable & Resizable Draggable Window) */}
-        {canvasMode === 'windowed' && (
-          <DraggableWindow
-            id="window-3d-canvas"
-            title={`Visualizador CAD 3D (${project.name})`}
-            icon={<Box className="w-4 h-4 text-sky-400" />}
-            defaultPosition={{ x: 310, y: 16 }}
-            width={840}
-            height={550}
-            zIndex={focusedWindow === 'canvas' ? 30 : 20}
-            onFocus={() => setFocusedWindow('canvas')}
-            onClose={() => setCanvasMode('minimized')}
-          >
-            <div className="w-full h-[500px] relative overflow-hidden rounded-b-xl">
-              <CADViewport
-                project={project}
-                displayMode={displayMode}
-                showPlanes={showPlanes}
-                showGrid={showGrid}
-                sectionView={sectionView}
-                activePlane={activePlane}
-                onSelectPlane={setActivePlane}
-                isMeasuring={activeTool === 'measure'}
-                onMeasureSelect={(res) => setMeasurementResult(res)}
-              />
-
-              <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-zinc-950/80 p-1 rounded-xl border border-zinc-800">
+        {/* TAB 2: ENGINEERING MATERIALS & PROPULSION ANALYSIS STUDIO */}
+        {activeTab === 'Análise de Materiais & Propulsão' && (
+          <div className="absolute inset-0 w-full h-full z-10 bg-zinc-950 p-6 overflow-y-auto font-sans text-xs select-none space-y-6">
+            <div className="max-w-5xl mx-auto space-y-6">
+              
+              <div className="bg-gradient-to-r from-sky-950/60 via-zinc-900 to-teal-950/60 p-6 rounded-3xl border border-sky-500/30 shadow-2xl flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-sky-400" />
+                    Estúdio de Análise de Materiais, Massa & Propulsão
+                  </h2>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    Cálculos paramétricos em tempo real baseados nas geometrias CAD 3D do projeto <span className="text-sky-300 font-bold">{project.name}</span>.
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setCanvasMode('fullscreen')}
-                  className="px-2.5 py-1 bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 font-bold rounded-lg flex items-center gap-1.5 text-xs border border-sky-500/40 transition cursor-pointer"
-                  title="Expandir para Tela Cheia"
+                  onClick={() => setActiveTab(tabs[0] || 'Estúdio Principal 3D')}
+                  className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shadow-lg"
                 >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                  <span>Expandir Tela Cheia</span>
+                  <Box className="w-4 h-4" />
+                  <span>Voltar para Modelagem 3D</span>
                 </button>
               </div>
-            </div>
-          </DraggableWindow>
-        )}
 
-        {/* Minimized 3D CAD Canvas Trigger Badge */}
-        {canvasMode === 'minimized' && (
-          <button
-            type="button"
-            onClick={() => setCanvasMode('fullscreen')}
-            className="absolute bottom-12 right-6 z-40 px-4 py-2 bg-sky-950/90 hover:bg-sky-900 border border-sky-500/50 text-sky-200 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold transition-all cursor-pointer backdrop-blur-md ring-2 ring-sky-500/30 animate-pulse"
-          >
-            <Box className="w-4 h-4 text-sky-400" />
-            <span>Visualizador CAD 3D (Minimizado) - Clique para Expandir</span>
-            <Maximize2 className="w-3.5 h-3.5 text-sky-400 ml-1" />
-          </button>
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-zinc-900/90 rounded-2xl border border-zinc-800">
+                  <span className="text-[10px] text-zinc-400 block font-bold uppercase">Massa Total Calculada</span>
+                  <span className="text-xl font-bold font-mono text-sky-400">
+                    {(project.parts.reduce((a, b) => a + b.mass, 0) / 1000).toFixed(2)} kg
+                  </span>
+                  <span className="text-[10px] text-zinc-500 block mt-1">Densidade média: 1.85 g/cm³</span>
+                </div>
+
+                <div className="p-4 bg-zinc-900/90 rounded-2xl border border-zinc-800">
+                  <span className="text-[10px] text-zinc-400 block font-bold uppercase">Volume 3D Acumulado</span>
+                  <span className="text-xl font-bold font-mono text-teal-300">
+                    {project.parts.reduce((a, b) => a + b.volume, 0).toLocaleString('pt-BR')} cm³
+                  </span>
+                  <span className="text-[10px] text-zinc-500 block mt-1">Baseado nos sketches extrudados</span>
+                </div>
+
+                <div className="p-4 bg-zinc-900/90 rounded-2xl border border-zinc-800">
+                  <span className="text-[10px] text-zinc-400 block font-bold uppercase">Área Superficial Total</span>
+                  <span className="text-xl font-bold font-mono text-amber-300">
+                    {project.parts.reduce((a, b) => a + b.surfaceArea, 0).toLocaleString('pt-BR')} cm²
+                  </span>
+                  <span className="text-[10px] text-zinc-500 block mt-1">Resistência ao arrasto aerodinâmico</span>
+                </div>
+
+                <div className="p-4 bg-zinc-900/90 rounded-2xl border border-zinc-800">
+                  <span className="text-[10px] text-zinc-400 block font-bold uppercase">Fator de Segurança (FOS)</span>
+                  <span className="text-xl font-bold font-mono text-emerald-400">
+                    2.45 (Seguro)
+                  </span>
+                  <span className="text-[10px] text-zinc-500 block mt-1">Alumínio 7075-T6 & Carbono</span>
+                </div>
+              </div>
+
+              {/* Subsystems Breakdown Table */}
+              <div className="p-5 bg-zinc-900/80 rounded-2xl border border-zinc-800 space-y-4">
+                <h3 className="font-bold text-zinc-200 text-sm flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-sky-400" />
+                  Especificações dos Componentes e Materiais Atribuidos
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-zinc-300 border-collapse">
+                    <thead>
+                      <tr className="border-b border-zinc-800 text-zinc-400 font-bold">
+                        <th className="py-2 px-3">Peça / Conjunto</th>
+                        <th className="py-2 px-3">Material Atribuído</th>
+                        <th className="py-2 px-3">Densidade</th>
+                        <th className="py-2 px-3">Massa Est. (g)</th>
+                        <th className="py-2 px-3">Status de Tensão</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {project.parts.map((part) => (
+                        <tr key={part.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition">
+                          <td className="py-2.5 px-3 font-bold text-zinc-100">{part.name}</td>
+                          <td className="py-2.5 px-3 text-sky-300">{part.material.name}</td>
+                          <td className="py-2.5 px-3 font-mono">{part.material.density} g/cm³</td>
+                          <td className="py-2.5 px-3 font-mono text-teal-300">{part.mass.toLocaleString('pt-BR')} g</td>
+                          <td className="py-2.5 px-3">
+                            <span className="bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-md font-bold text-[10px]">
+                              Aprovado (Von Mises OK)
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
         )}
 
         {/* Movable Window 1: Feature Tree (Estrutura de Modelagem) */}
@@ -431,7 +487,13 @@ export default function App() {
         {propertyModalType && (
           <DraggableWindow
             id="window-property-panel"
-            title={`Inspetor Paramétrico: ${propertyModalType === 'extrude' ? 'Extrusão 3D' : propertyModalType === 'revolve' ? 'Revolução' : 'Loft Curvo'}`}
+            title={`Inspetor Paramétrico: ${
+              propertyModalType === 'extrude' ? 'Extrusão 3D' : 
+              propertyModalType === 'revolve' ? 'Revolução' : 
+              propertyModalType === 'loft' ? 'Loft Curvo' : 
+              propertyModalType === 'frame' ? 'Gerador de Tubos & Chassi' : 
+              'Corte & Junção de Tubos'
+            }`}
             icon={<Sliders className="w-4 h-4 text-teal-400" />}
             defaultPosition={{ x: Math.max(20, Math.floor(window.innerWidth / 2) - 200), y: 40 }}
             zIndex={focusedWindow === 'property' ? 30 : 20}

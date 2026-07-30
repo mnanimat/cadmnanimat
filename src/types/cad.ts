@@ -41,7 +41,9 @@ export type FeatureType =
   | 'chamfer' 
   | 'shell' 
   | 'cut'
-  | 'pattern';
+  | 'pattern'
+  | 'frame'
+  | 'pipe_miter';
 
 export interface ExtrudeParams {
   sketchId: string;
@@ -74,16 +76,40 @@ export interface ShellParams {
   thickness: number;
 }
 
+export interface FrameParams {
+  sketchId: string;
+  profileType?: 'round' | 'square' | 'rectangular';
+  profile?: 'round' | 'square' | 'rectangular';
+  outerDiameter: number; // e.g., 31.75 mm (1.25" tube) or 25.4 mm (1")
+  wallThickness: number; // e.g., 2.0 mm
+  widthRect?: number;
+  width?: number;
+  height?: number;
+  cornerMiter?: boolean; // auto 45-degree corner connection
+  miterJoints?: boolean;
+}
+
+export interface PipeMiterParams {
+  targetFeatureIds?: string[];
+  miterType?: 'miter_45' | 'trim_extend' | 'butt_joint';
+  gap?: number;
+  cutAngle?: number;
+  offset?: number;
+}
+
 export interface CADFeature {
   id: string;
   name: string;
   type: FeatureType;
   sketchId?: string; // primary sketch if applicable
-  params: ExtrudeParams | RevolveParams | LoftParams | FilletParams | ShellParams | any;
+  params: ExtrudeParams | RevolveParams | LoftParams | FilletParams | ShellParams | FrameParams | PipeMiterParams | any;
   visible: boolean;
   suppressed: boolean;
   color?: string;
   materialId?: string;
+  position?: Point3D; // Transformation offset (X, Y, Z) in mm
+  rotation?: Point3D; // Rotation angles (RX, RY, RZ) in degrees
+  scale?: Point3D;    // Scale factor (SX, SY, SZ)
 }
 
 export interface MaterialProps {
@@ -116,10 +142,14 @@ export interface CADProject {
   parts: CADPart[];
   activePlane: PlaneType;
   activeSketchId?: string;
+  selectedFeatureId?: string;
 }
 
 export type ActiveTool = 
   | 'select' 
+  | 'translate'
+  | 'rotate'
+  | 'scale'
   | 'orbit' 
   | 'sketch_line' 
   | 'sketch_rect' 
@@ -129,6 +159,8 @@ export type ActiveTool =
   | 'extrude' 
   | 'revolve' 
   | 'loft' 
+  | 'frame'
+  | 'pipe_miter'
   | 'fillet' 
   | 'shell' 
   | 'measure' 

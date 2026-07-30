@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { OrbitControls } from 'three-stdlib';
+import { OrbitControls, TransformControls } from 'three-stdlib';
 import { 
   CADProject, 
   DisplayMode, 
   PlaneType, 
   Point3D, 
-  MeasurementResult 
+  MeasurementResult,
+  ActiveTool 
 } from '../types/cad';
 import { buildFeatureMesh } from '../utils/cadKernel';
 import { ViewCube } from './ViewCube';
@@ -18,7 +19,11 @@ interface CADViewportProps {
   showGrid: boolean;
   sectionView: boolean;
   activePlane: PlaneType;
+  activeTool: ActiveTool;
+  selectedFeatureId?: string;
   onSelectPlane: (plane: PlaneType) => void;
+  onSelectFeature?: (featureId: string) => void;
+  onUpdateFeatureTransform?: (featureId: string, transform: { position?: Point3D; rotation?: Point3D; scale?: Point3D }) => void;
   onMeasureSelect?: (result: MeasurementResult) => void;
   isMeasuring?: boolean;
 }
@@ -30,7 +35,11 @@ export const CADViewport: React.FC<CADViewportProps> = ({
   showGrid,
   sectionView,
   activePlane,
+  activeTool,
+  selectedFeatureId,
   onSelectPlane,
+  onSelectFeature,
+  onUpdateFeatureTransform,
   onMeasureSelect,
   isMeasuring = false
 }) => {
@@ -38,6 +47,7 @@ export const CADViewport: React.FC<CADViewportProps> = ({
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+  const transformControlsRef = useRef<TransformControls | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const modelGroupRef = useRef<THREE.Group | null>(null);
   const planesGroupRef = useRef<THREE.Group | null>(null);
@@ -49,15 +59,17 @@ export const CADViewport: React.FC<CADViewportProps> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const width = containerRef.current.clientWidth;
-    const height = containerRef.current.clientHeight;
+    containerRef.current.innerHTML = '';
+
+    const width = containerRef.current.clientWidth || 800;
+    const height = containerRef.current.clientHeight || 600;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#0f172a'); // Rich Slate Navy
     sceneRef.current = scene;
 
     // Camera
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 5000);
+    const camera = new THREE.PerspectiveCamera(45, width > 0 && height > 0 ? width / height : 1.33, 0.1, 5000);
     camera.position.set(300, 250, 400);
     cameraRef.current = camera;
 
@@ -67,6 +79,9 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.domElement.style.display = 'block';
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
     rendererRef.current = renderer;
 
     containerRef.current.appendChild(renderer.domElement);
@@ -78,6 +93,42 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     controls.maxDistance = 2500;
     controls.minDistance = 10;
     controlsRef.current = controls;
+
+    // Transform Controls Gizmo
+    const tControls = new TransformControls(camera, renderer.domElement) as any;
+    tControls.size = 0.85;
+    tControls.addEventListener('dragging-changed', (event: any) => {
+      controls.enabled = !event.value;
+    });
+
+    tControls.addEventListener('objectChange', () => {
+      if (tControls.object && onUpdateFeatureTransform) {
+        const obj = tControls.object;
+        const featId = obj.userData?.featureId;
+        if (featId) {
+          onUpdateFeatureTransform(featId, {
+            position: {
+              x: Math.round(obj.position.x * 10) / 10,
+              y: Math.round(obj.position.y * 10) / 10,
+              z: Math.round(obj.position.z * 10) / 10,
+            },
+            rotation: {
+              x: Math.round((obj.rotation.x * 180 / Math.PI) * 10) / 10,
+              y: Math.round((obj.rotation.y * 180 / Math.PI) * 10) / 10,
+              z: Math.round((obj.rotation.z * 180 / Math.PI) * 10) / 10,
+            },
+            scale: {
+              x: Math.round(obj.scale.x * 100) / 100,
+              y: Math.round(obj.scale.y * 100) / 100,
+              z: Math.round(obj.scale.z * 100) / 100,
+            }
+          });
+        }
+      }
+    });
+
+    scene.add(tControls);
+    transformControlsRef.current = tControls;
 
     // Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -129,30 +180,62 @@ export const CADViewport: React.FC<CADViewportProps> = ({
       if (w <= 0 || h <= 0) return;
       cameraRef.current.aspect = w / h;
       cameraRef.current.updateProjectionMatrix();
-      rendererRef.current.setSize(w, h);
+      rendererRef.current.setSize(w, h, false);
     };
 
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(containerRef.current);
-    // Initial call after a microtask to handle dynamic container layout
     setTimeout(handleResize, 50);
 
     return () => {
       cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
-      if (renderer.domElement && containerRef.current) {
-        containerRef.current.removeChild(renderer.domElement);
+      if (renderer.domElement && renderer.domElement.parentNode) {
+        renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
+      tControls.dispose();
+      controls.dispose();
       renderer.dispose();
     };
   }, []);
+
+  // Sync Transform Gizmo mode & target object
+  useEffect(() => {
+    if (!transformControlsRef.current || !modelGroupRef.current) return;
+    const tControls = transformControlsRef.current;
+
+    const isTransformTool = activeTool === 'translate' || activeTool === 'rotate' || activeTool === 'scale';
+    
+    if (isTransformTool) {
+      tControls.setMode(activeTool);
+      tControls.enabled = true;
+    } else {
+      tControls.enabled = false;
+    }
+
+    if (selectedFeatureId && modelGroupRef.current) {
+      let targetMesh: THREE.Object3D | null = null;
+      modelGroupRef.current.traverse((child) => {
+        if (child.userData && child.userData.featureId === selectedFeatureId && child instanceof THREE.Mesh) {
+          targetMesh = child;
+        }
+      });
+
+      if (targetMesh && isTransformTool) {
+        tControls.attach(targetMesh);
+      } else {
+        tControls.detach();
+      }
+    } else {
+      tControls.detach();
+    }
+  }, [selectedFeatureId, activeTool, project]);
 
   // Update Workplanes Rendering (Top, Front, Right translucency)
   useEffect(() => {
     if (!planesGroupRef.current) return;
     const group = planesGroupRef.current;
 
-    // Clear old planes
     while (group.children.length > 0) {
       group.remove(group.children[0]);
     }
@@ -174,7 +257,6 @@ export const CADViewport: React.FC<CADViewportProps> = ({
       const mesh = new THREE.Mesh(planeGeometry, planeMat);
       mesh.rotation.set(...rot);
 
-      // Plane border outline
       const edges = new THREE.EdgesGeometry(planeGeometry);
       const lineMat = new THREE.LineBasicMaterial({
         color: activePlane === type ? 0x38bdf8 : colorHex,
@@ -191,7 +273,6 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     const rightPlane = createPlaneMesh('Right', 0xef4444, [0, Math.PI / 2, 0], 'Right Plane');
 
     group.add(topPlane, frontPlane, rightPlane);
-
   }, [showPlanes, activePlane]);
 
   // Grid visibility effect
@@ -200,6 +281,19 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     const grid = sceneRef.current.getObjectByName('CAD_GRID');
     if (grid) grid.visible = showGrid;
   }, [showGrid]);
+
+  // Section Cut View Effect
+  useEffect(() => {
+    if (!rendererRef.current) return;
+    if (sectionView) {
+      const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 10);
+      rendererRef.current.clippingPlanes = [plane];
+      rendererRef.current.localClippingEnabled = true;
+    } else {
+      rendererRef.current.clippingPlanes = [];
+      rendererRef.current.localClippingEnabled = false;
+    }
+  }, [sectionView]);
 
   // Rebuild 3D CAD Geometries when project changes
   useEffect(() => {
@@ -213,20 +307,25 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     for (const feature of project.features) {
       const built = buildFeatureMesh(feature, project);
       if (built) {
+        // Highlight selected feature mesh
+        if (selectedFeatureId && feature.id === selectedFeatureId) {
+          (built.mesh.material as THREE.MeshStandardMaterial).emissive = new THREE.Color('#0284c7');
+          (built.mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.35;
+        }
         group.add(built.mesh);
         group.add(built.edgeLines);
       }
     }
 
     // Auto-center camera target on model bounding box if geometries exist
-    if (group.children.length > 0 && controlsRef.current) {
+    if (group.children.length > 0 && controlsRef.current && !selectedFeatureId) {
       const bbox = new THREE.Box3().setFromObject(group);
       const center = new THREE.Vector3();
       bbox.getCenter(center);
       controlsRef.current.target.copy(center);
       controlsRef.current.update();
     }
-  }, [project]);
+  }, [project, selectedFeatureId]);
 
   // Handle Display Modes (Shaded, Wireframe, X-Ray)
   useEffect(() => {
@@ -295,9 +394,9 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     ctr.update();
   };
 
-  // Raycasting for Measurement tool
+  // Raycasting for Selection & Measurement tool
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isMeasuring || !containerRef.current || !cameraRef.current || !modelGroupRef.current) return;
+    if (!containerRef.current || !cameraRef.current || !modelGroupRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -307,28 +406,37 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     raycaster.setFromCamera(new THREE.Vector2(x, y), cameraRef.current);
 
     const intersects = raycaster.intersectObjects(modelGroupRef.current.children, true);
+
     if (intersects.length > 0) {
-      const hitPt = intersects[0].point;
-      const pt3d: Point3D = {
-        x: Math.round(hitPt.x * 10) / 10,
-        y: Math.round(hitPt.y * 10) / 10,
-        z: Math.round(hitPt.z * 10) / 10
-      };
+      const hitObj = intersects[0].object;
+      const featId = hitObj.userData?.featureId;
+      if (featId && onSelectFeature && !isMeasuring) {
+        onSelectFeature(featId);
+      }
 
-      const newPts = [...measurePoints, pt3d];
-      setMeasurePoints(newPts);
+      if (isMeasuring) {
+        const hitPt = intersects[0].point;
+        const pt3d: Point3D = {
+          x: Math.round(hitPt.x * 10) / 10,
+          y: Math.round(hitPt.y * 10) / 10,
+          z: Math.round(hitPt.z * 10) / 10
+        };
 
-      if (newPts.length === 2) {
-        const [p1, p2] = newPts;
-        const dx = Math.abs(p2.x - p1.x);
-        const dy = Math.abs(p2.y - p1.y);
-        const dz = Math.abs(p2.z - p1.z);
-        const dist = Math.round(Math.hypot(dx, dy, dz) * 10) / 10;
+        const newPts = [...measurePoints, pt3d];
+        setMeasurePoints(newPts);
 
-        if (onMeasureSelect) {
-          onMeasureSelect({ p1, p2, distance: dist, dx, dy, dz });
+        if (newPts.length === 2) {
+          const [p1, p2] = newPts;
+          const dx = Math.abs(p2.x - p1.x);
+          const dy = Math.abs(p2.y - p1.y);
+          const dz = Math.abs(p2.z - p1.z);
+          const dist = Math.round(Math.hypot(dx, dy, dz) * 10) / 10;
+
+          if (onMeasureSelect) {
+            onMeasureSelect({ p1, p2, distance: dist, dx, dy, dz });
+          }
+          setMeasurePoints([]);
         }
-        setMeasurePoints([]);
       }
     }
   };
@@ -346,7 +454,7 @@ export const CADViewport: React.FC<CADViewportProps> = ({
 
       {/* Axis Gizmo Label */}
       <div className="absolute bottom-4 left-4 z-10 flex items-center gap-3 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono">
-        <span className="text-red-400 font-bold">X (Direção)</span>
+        <span className="text-red-400 font-bold">X (Eixo Lado)</span>
         <span className="text-green-400 font-bold">Y (Altura)</span>
         <span className="text-blue-400 font-bold">Z (Profundidade)</span>
       </div>
@@ -359,3 +467,4 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     </div>
   );
 };
+

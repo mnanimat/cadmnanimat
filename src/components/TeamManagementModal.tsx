@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TeamMember, BudgetItem, InventoryItem } from '../types/engineering';
-import { Users, DollarSign, Package, Plus, Trash2, CheckCircle2, AlertCircle, PieChart, UserPlus, FileSpreadsheet } from 'lucide-react';
+import { Users, DollarSign, Package, Plus, Trash2, Edit2, UserPlus, FileSpreadsheet, Check, X } from 'lucide-react';
 
 interface TeamManagementModalProps {
   onClose?: () => void;
@@ -37,86 +37,201 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = () => {
     { id: 'inv_5', name: 'Tecido de Fibra de Vidro Kevlar 200g/m²', category: 'Compósitos & Fibras', quantity: 15, unit: 'm²', unitCost: 110, minStock: 5, supplier: 'FiberGlass Solutions' },
   ]);
 
-  // Modals for creating new items
+  // Modals & Form State for Members
   const [showAddMember, setShowAddMember] = useState(false);
-  const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberRole, setNewMemberRole] = useState<TeamMember['role']>('Estruturas & CAD');
-  const [newMemberEmail, setNewMemberEmail] = useState('');
-  const [newMemberSubsystem, setNewMemberSubsystem] = useState('');
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [memberForm, setMemberForm] = useState<{
+    name: string;
+    role: TeamMember['role'];
+    email: string;
+    subsystem: string;
+    status: TeamMember['status'];
+  }>({
+    name: '',
+    role: 'Estruturas & CAD',
+    email: '',
+    subsystem: '',
+    status: 'Ativo'
+  });
 
+  // Modals & Form State for Expenses
   const [showAddExpense, setShowAddExpense] = useState(false);
-  const [newExpenseDesc, setNewExpenseDesc] = useState('');
-  const [newExpenseCat, setNewExpenseCat] = useState<BudgetItem['category']>('Propulsão');
-  const [newExpenseCost, setNewExpenseCost] = useState<number>(1000);
-  const [newExpenseResp, setNewExpenseResp] = useState('Gabriel Santos');
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [expenseForm, setExpenseForm] = useState<{
+    description: string;
+    category: BudgetItem['category'];
+    cost: number;
+    responsible: string;
+    status: BudgetItem['status'];
+  }>({
+    description: '',
+    category: 'Propulsão',
+    cost: 1000,
+    responsible: 'Gabriel Santos',
+    status: 'Aprovado'
+  });
 
+  // Modals & Form State for Inventory
   const [showAddInventory, setShowAddInventory] = useState(false);
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemCat, setNewItemCat] = useState<InventoryItem['category']>('Compósitos & Fibras');
-  const [newItemQty, setNewItemQty] = useState<number>(5);
-  const [newItemUnit, setNewItemUnit] = useState<InventoryItem['unit']>('kg');
-  const [newItemCost, setNewItemCost] = useState<number>(250);
-  const [newItemSupplier, setNewItemSupplier] = useState('Suprimentos Eng');
+  const [editingInventoryId, setEditingInventoryId] = useState<string | null>(null);
+  const [inventoryForm, setInventoryForm] = useState<{
+    name: string;
+    category: InventoryItem['category'];
+    quantity: number;
+    unit: InventoryItem['unit'];
+    unitCost: number;
+    supplier: string;
+  }>({
+    name: '',
+    category: 'Compósitos & Fibras',
+    quantity: 5,
+    unit: 'kg',
+    unitCost: 250,
+    supplier: 'Suprimentos Eng'
+  });
 
   // Financial calculations
   const totalSpent = expenses.reduce((acc, curr) => acc + curr.cost, 0);
   const remainingBudget = totalBudget - totalSpent;
   const totalInventoryValue = inventory.reduce((acc, curr) => acc + (curr.quantity * curr.unitCost), 0);
 
-  const handleAddMemberSubmit = (e: React.FormEvent) => {
+  // MEMBER HANDLERS
+  const startEditMember = (m: TeamMember) => {
+    setEditingMemberId(m.id);
+    setMemberForm({
+      name: m.name,
+      role: m.role,
+      email: m.email,
+      subsystem: m.subsystem,
+      status: m.status
+    });
+    setShowAddMember(true);
+  };
+
+  const handleMemberSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMemberName) return;
-    setTeam(prev => [
-      ...prev,
-      {
-        id: `tm_${Date.now()}`,
-        name: newMemberName,
-        role: newMemberRole,
-        email: newMemberEmail || `${newMemberName.toLowerCase().replace(/\s+/g, '.')}@equipe.edu.br`,
-        subsystem: newMemberSubsystem || 'Geral',
-        status: 'Ativo'
-      }
-    ]);
-    setNewMemberName('');
+    if (!memberForm.name) return;
+
+    if (editingMemberId) {
+      setTeam(prev => prev.map(m => m.id === editingMemberId ? {
+        ...m,
+        name: memberForm.name,
+        role: memberForm.role,
+        email: memberForm.email,
+        subsystem: memberForm.subsystem,
+        status: memberForm.status
+      } : m));
+    } else {
+      setTeam(prev => [
+        ...prev,
+        {
+          id: `tm_${Date.now()}`,
+          name: memberForm.name,
+          role: memberForm.role,
+          email: memberForm.email || `${memberForm.name.toLowerCase().replace(/\s+/g, '.')}@equipe.edu.br`,
+          subsystem: memberForm.subsystem || 'Geral',
+          status: memberForm.status
+        }
+      ]);
+    }
+
+    setEditingMemberId(null);
+    setMemberForm({ name: '', role: 'Estruturas & CAD', email: '', subsystem: '', status: 'Ativo' });
     setShowAddMember(false);
   };
 
-  const handleAddExpenseSubmit = (e: React.FormEvent) => {
+  // EXPENSE HANDLERS
+  const startEditExpense = (exp: BudgetItem) => {
+    setEditingExpenseId(exp.id);
+    setExpenseForm({
+      description: exp.description,
+      category: exp.category,
+      cost: exp.cost,
+      responsible: exp.responsible,
+      status: exp.status
+    });
+    setShowAddExpense(true);
+  };
+
+  const handleExpenseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newExpenseDesc || newExpenseCost <= 0) return;
-    setExpenses(prev => [
-      ...prev,
-      {
-        id: `exp_${Date.now()}`,
-        description: newExpenseDesc,
-        category: newExpenseCat,
-        cost: Number(newExpenseCost),
-        date: new Date().toISOString().split('T')[0],
-        status: 'Aprovado',
-        responsible: newExpenseResp
-      }
-    ]);
-    setNewExpenseDesc('');
+    if (!expenseForm.description || expenseForm.cost <= 0) return;
+
+    if (editingExpenseId) {
+      setExpenses(prev => prev.map(exp => exp.id === editingExpenseId ? {
+        ...exp,
+        description: expenseForm.description,
+        category: expenseForm.category,
+        cost: Number(expenseForm.cost),
+        responsible: expenseForm.responsible,
+        status: expenseForm.status
+      } : exp));
+    } else {
+      setExpenses(prev => [
+        ...prev,
+        {
+          id: `exp_${Date.now()}`,
+          description: expenseForm.description,
+          category: expenseForm.category,
+          cost: Number(expenseForm.cost),
+          date: new Date().toISOString().split('T')[0],
+          status: expenseForm.status,
+          responsible: expenseForm.responsible
+        }
+      ]);
+    }
+
+    setEditingExpenseId(null);
+    setExpenseForm({ description: '', category: 'Propulsão', cost: 1000, responsible: 'Gabriel Santos', status: 'Aprovado' });
     setShowAddExpense(false);
   };
 
-  const handleAddInventorySubmit = (e: React.FormEvent) => {
+  // INVENTORY HANDLERS
+  const startEditInventory = (inv: InventoryItem) => {
+    setEditingInventoryId(inv.id);
+    setInventoryForm({
+      name: inv.name,
+      category: inv.category,
+      quantity: inv.quantity,
+      unit: inv.unit,
+      unitCost: inv.unitCost,
+      supplier: inv.supplier
+    });
+    setShowAddInventory(true);
+  };
+
+  const handleInventorySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItemName) return;
-    setInventory(prev => [
-      ...prev,
-      {
-        id: `inv_${Date.now()}`,
-        name: newItemName,
-        category: newItemCat,
-        quantity: Number(newItemQty),
-        unit: newItemUnit,
-        unitCost: Number(newItemCost),
-        minStock: 2,
-        supplier: newItemSupplier
-      }
-    ]);
-    setNewItemName('');
+    if (!inventoryForm.name) return;
+
+    if (editingInventoryId) {
+      setInventory(prev => prev.map(inv => inv.id === editingInventoryId ? {
+        ...inv,
+        name: inventoryForm.name,
+        category: inventoryForm.category,
+        quantity: Number(inventoryForm.quantity),
+        unit: inventoryForm.unit,
+        unitCost: Number(inventoryForm.unitCost),
+        supplier: inventoryForm.supplier
+      } : inv));
+    } else {
+      setInventory(prev => [
+        ...prev,
+        {
+          id: `inv_${Date.now()}`,
+          name: inventoryForm.name,
+          category: inventoryForm.category,
+          quantity: Number(inventoryForm.quantity),
+          unit: inventoryForm.unit,
+          unitCost: Number(inventoryForm.unitCost),
+          minStock: 2,
+          supplier: inventoryForm.supplier
+        }
+      ]);
+    }
+
+    setEditingInventoryId(null);
+    setInventoryForm({ name: '', category: 'Compósitos & Fibras', quantity: 5, unit: 'kg', unitCost: 250, supplier: 'Suprimentos Eng' });
     setShowAddInventory(false);
   };
 
@@ -175,7 +290,11 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = () => {
             </h3>
             <button
               type="button"
-              onClick={() => setShowAddMember(true)}
+              onClick={() => {
+                setEditingMemberId(null);
+                setMemberForm({ name: '', role: 'Estruturas & CAD', email: '', subsystem: '', status: 'Ativo' });
+                setShowAddMember(true);
+              }}
               className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs flex items-center gap-1 transition cursor-pointer shadow-sm"
             >
               <UserPlus className="w-3.5 h-3.5" />
@@ -199,14 +318,21 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <span className="text-[10px] bg-zinc-800 text-sky-300 px-2.5 py-1 rounded-lg border border-zinc-700 font-medium">
                     {m.role}
                   </span>
                   <button
+                    onClick={() => startEditMember(m)}
+                    className="p-1.5 hover:bg-sky-500/20 text-zinc-400 hover:text-sky-300 rounded-lg transition"
+                    title="Editar Membro"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
                     onClick={() => setTeam(prev => prev.filter(item => item.id !== m.id))}
-                    className="p-1 hover:bg-rose-500/20 text-zinc-500 hover:text-rose-400 rounded-lg transition"
-                    title="Remover"
+                    className="p-1.5 hover:bg-rose-500/20 text-zinc-500 hover:text-rose-400 rounded-lg transition"
+                    title="Remover Membro"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -225,7 +351,14 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = () => {
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-zinc-900/90 p-3 rounded-2xl border border-zinc-800">
               <span className="text-[10px] text-zinc-400 block font-medium">Orçamento Aprovado</span>
-              <span className="font-mono text-xs font-bold text-zinc-100">R$ {totalBudget.toLocaleString('pt-BR')}</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={totalBudget}
+                  onChange={e => setTotalBudget(Number(e.target.value))}
+                  className="font-mono text-xs font-bold text-zinc-100 bg-zinc-950 border border-zinc-800 px-2 py-0.5 rounded-lg w-28"
+                />
+              </div>
             </div>
 
             <div className="bg-zinc-900/90 p-3 rounded-2xl border border-zinc-800">
@@ -246,7 +379,11 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = () => {
             </h3>
             <button
               type="button"
-              onClick={() => setShowAddExpense(true)}
+              onClick={() => {
+                setEditingExpenseId(null);
+                setExpenseForm({ description: '', category: 'Propulsão', cost: 1000, responsible: 'Gabriel Santos', status: 'Aprovado' });
+                setShowAddExpense(true);
+              }}
               className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold text-xs flex items-center gap-1 transition cursor-pointer shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -273,6 +410,20 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = () => {
                   }`}>
                     {e.status}
                   </span>
+                  <button
+                    onClick={() => startEditExpense(e)}
+                    className="p-1 hover:bg-teal-500/20 text-zinc-400 hover:text-teal-300 rounded-lg transition"
+                    title="Editar Gasto"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setExpenses(prev => prev.filter(item => item.id !== e.id))}
+                    className="p-1 hover:bg-rose-500/20 text-zinc-500 hover:text-rose-400 rounded-lg transition"
+                    title="Excluir Gasto"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -291,7 +442,11 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = () => {
             </div>
             <button
               type="button"
-              onClick={() => setShowAddInventory(true)}
+              onClick={() => {
+                setEditingInventoryId(null);
+                setInventoryForm({ name: '', category: 'Compósitos & Fibras', quantity: 5, unit: 'kg', unitCost: 250, supplier: 'Suprimentos Eng' });
+                setShowAddInventory(true);
+              }}
               className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold text-xs flex items-center gap-1 transition cursor-pointer shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -309,13 +464,29 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = () => {
                   <h4 className="font-bold text-zinc-200">{inv.name}</h4>
                   <p className="text-[10px] text-zinc-400">{inv.category} • Fornecedor: <span className="text-zinc-300">{inv.supplier}</span></p>
                 </div>
-                <div className="text-right">
-                  <span className="font-mono font-bold text-amber-300 text-xs block">
-                    {inv.quantity} {inv.unit}
-                  </span>
-                  <span className="text-[10px] text-zinc-400 font-mono">
-                    R$ {(inv.quantity * inv.unitCost).toLocaleString('pt-BR')}
-                  </span>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <span className="font-mono font-bold text-amber-300 text-xs block">
+                      {inv.quantity} {inv.unit}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 font-mono">
+                      R$ {(inv.quantity * inv.unitCost).toLocaleString('pt-BR')}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => startEditInventory(inv)}
+                    className="p-1 hover:bg-amber-500/20 text-zinc-400 hover:text-amber-300 rounded-lg transition"
+                    title="Editar Material"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setInventory(prev => prev.filter(item => item.id !== inv.id))}
+                    className="p-1 hover:bg-rose-500/20 text-zinc-500 hover:text-rose-400 rounded-lg transition"
+                    title="Excluir Material"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -323,107 +494,191 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = () => {
         </div>
       )}
 
-      {/* MODAL: ADD MEMBER */}
+      {/* MODAL: ADD / EDIT MEMBER */}
       {showAddMember && (
         <div className="p-4 bg-zinc-900 rounded-2xl border border-sky-500/40 space-y-3">
-          <h4 className="font-bold text-sky-400 text-xs">Adicionar Novo Membro na Equipe</h4>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Nome do integrante"
-              value={newMemberName}
-              onChange={e => setNewMemberName(e.target.value)}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white"
-            />
-            <select
-              value={newMemberRole}
-              onChange={e => setNewMemberRole(e.target.value as any)}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-sky-300 font-bold"
-            >
-              <option value="Engenheiro Chefe">Engenheiro Chefe</option>
-              <option value="Propulsão & Motor">Propulsão & Motor</option>
-              <option value="Estruturas & CAD">Estruturas & CAD</option>
-              <option value="Eletrônica & Aviônica">Eletrônica & Aviônica</option>
-              <option value="Gestão Financeira">Gestão Financeira</option>
-            </select>
-          </div>
-          <div className="flex justify-end gap-2 pt-1">
-            <button onClick={() => setShowAddMember(false)} className="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-lg text-xs">Cancelar</button>
-            <button onClick={handleAddMemberSubmit} className="px-4 py-1 bg-sky-600 text-white rounded-lg text-xs font-bold">Salvar</button>
-          </div>
+          <h4 className="font-bold text-sky-400 text-xs flex items-center justify-between">
+            <span>{editingMemberId ? 'Editar Integrante da Equipe' : 'Adicionar Novo Membro na Equipe'}</span>
+            <button onClick={() => setShowAddMember(false)} className="text-zinc-500 hover:text-white"><X className="w-4 h-4" /></button>
+          </h4>
+          <form onSubmit={handleMemberSubmit} className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="Nome do integrante"
+                value={memberForm.name}
+                onChange={e => setMemberForm({ ...memberForm, name: e.target.value })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white"
+                required
+              />
+              <select
+                value={memberForm.role}
+                onChange={e => setMemberForm({ ...memberForm, role: e.target.value as any })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-sky-300 font-bold"
+              >
+                <option value="Engenheiro Chefe">Engenheiro Chefe</option>
+                <option value="Propulsão & Motor">Propulsão & Motor</option>
+                <option value="Estruturas & CAD">Estruturas & CAD</option>
+                <option value="Eletrônica & Aviônica">Eletrônica & Aviônica</option>
+                <option value="Gestão Financeira">Gestão Financeira</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="email"
+                placeholder="E-mail de contato"
+                value={memberForm.email}
+                onChange={e => setMemberForm({ ...memberForm, email: e.target.value })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white"
+              />
+              <input
+                type="text"
+                placeholder="Subsistema / Atribuição"
+                value={memberForm.subsystem}
+                onChange={e => setMemberForm({ ...memberForm, subsystem: e.target.value })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => setShowAddMember(false)} className="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-lg text-xs">Cancelar</button>
+              <button type="submit" className="px-4 py-1 bg-sky-600 text-white rounded-lg text-xs font-bold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" />
+                <span>Salvar</span>
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* MODAL: ADD EXPENSE */}
+      {/* MODAL: ADD / EDIT EXPENSE */}
       {showAddExpense && (
         <div className="p-4 bg-zinc-900 rounded-2xl border border-teal-500/40 space-y-3">
-          <h4 className="font-bold text-teal-400 text-xs">Lançar Novo Gasto no Projeto</h4>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Descrição do insumo/serviço"
-              value={newExpenseDesc}
-              onChange={e => setNewExpenseDesc(e.target.value)}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white col-span-2"
-            />
-            <input
-              type="number"
-              placeholder="Valor em R$"
-              value={newExpenseCost}
-              onChange={e => setNewExpenseCost(Number(e.target.value))}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-teal-300 font-mono font-bold"
-            />
-            <select
-              value={newExpenseCat}
-              onChange={e => setNewExpenseCat(e.target.value as any)}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-teal-300 font-bold"
-            >
-              <option value="Propulsão">Propulsão</option>
-              <option value="Estrutura & CAD">Estrutura & CAD</option>
-              <option value="Aviônica & Sensores">Aviônica & Sensores</option>
-              <option value="Materiais & Matéria-Prima">Materiais & Matéria-Prima</option>
-              <option value="Usinagem & Fabricação">Usinagem & Fabricação</option>
-              <option value="Logística & Inscrição">Logística & Inscrição</option>
-            </select>
-          </div>
-          <div className="flex justify-end gap-2 pt-1">
-            <button onClick={() => setShowAddExpense(false)} className="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-lg text-xs">Cancelar</button>
-            <button onClick={handleAddExpenseSubmit} className="px-4 py-1 bg-teal-600 text-white rounded-lg text-xs font-bold">Registrar</button>
-          </div>
+          <h4 className="font-bold text-teal-400 text-xs flex items-center justify-between">
+            <span>{editingExpenseId ? 'Editar Lançamento de Gasto' : 'Lançar Novo Gasto no Projeto'}</span>
+            <button onClick={() => setShowAddExpense(false)} className="text-zinc-500 hover:text-white"><X className="w-4 h-4" /></button>
+          </h4>
+          <form onSubmit={handleExpenseSubmit} className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="Descrição do insumo/serviço"
+                value={expenseForm.description}
+                onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white col-span-2"
+                required
+              />
+              <input
+                type="number"
+                placeholder="Valor em R$"
+                value={expenseForm.cost}
+                onChange={e => setExpenseForm({ ...expenseForm, cost: Number(e.target.value) })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-teal-300 font-mono font-bold"
+                required
+              />
+              <select
+                value={expenseForm.category}
+                onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value as any })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-teal-300 font-bold"
+              >
+                <option value="Propulsão">Propulsão</option>
+                <option value="Estrutura & CAD">Estrutura & CAD</option>
+                <option value="Aviônica & Sensores">Aviônica & Sensores</option>
+                <option value="Materiais & Matéria-Prima">Materiais & Matéria-Prima</option>
+                <option value="Usinagem & Fabricação">Usinagem & Fabricação</option>
+                <option value="Logística & Inscrição">Logística & Inscrição</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="Responsável"
+                value={expenseForm.responsible}
+                onChange={e => setExpenseForm({ ...expenseForm, responsible: e.target.value })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white"
+              />
+              <select
+                value={expenseForm.status}
+                onChange={e => setExpenseForm({ ...expenseForm, status: e.target.value as any })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-emerald-300 font-bold"
+              >
+                <option value="Pago">Pago</option>
+                <option value="Aprovado">Aprovado</option>
+                <option value="Pendente">Pendente</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => setShowAddExpense(false)} className="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-lg text-xs">Cancelar</button>
+              <button type="submit" className="px-4 py-1 bg-teal-600 text-white rounded-lg text-xs font-bold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" />
+                <span>Salvar</span>
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* MODAL: ADD INVENTORY */}
+      {/* MODAL: ADD / EDIT INVENTORY */}
       {showAddInventory && (
         <div className="p-4 bg-zinc-900 rounded-2xl border border-amber-500/40 space-y-3">
-          <h4 className="font-bold text-amber-400 text-xs">Cadastrar Material no Estoque</h4>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Nome do material"
-              value={newItemName}
-              onChange={e => setNewItemName(e.target.value)}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white col-span-2"
-            />
-            <input
-              type="number"
-              placeholder="Quantidade"
-              value={newItemQty}
-              onChange={e => setNewItemQty(Number(e.target.value))}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white"
-            />
-            <input
-              type="number"
-              placeholder="Custo Unitário R$"
-              value={newItemCost}
-              onChange={e => setNewItemCost(Number(e.target.value))}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-amber-300 font-mono"
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-1">
-            <button onClick={() => setShowAddInventory(false)} className="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-lg text-xs">Cancelar</button>
-            <button onClick={handleAddInventorySubmit} className="px-4 py-1 bg-amber-600 text-white rounded-lg text-xs font-bold">Adicionar</button>
-          </div>
+          <h4 className="font-bold text-amber-400 text-xs flex items-center justify-between">
+            <span>{editingInventoryId ? 'Editar Material no Estoque' : 'Cadastrar Material no Estoque'}</span>
+            <button onClick={() => setShowAddInventory(false)} className="text-zinc-500 hover:text-white"><X className="w-4 h-4" /></button>
+          </h4>
+          <form onSubmit={handleInventorySubmit} className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="Nome do material"
+                value={inventoryForm.name}
+                onChange={e => setInventoryForm({ ...inventoryForm, name: e.target.value })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white col-span-2"
+                required
+              />
+              <input
+                type="number"
+                placeholder="Quantidade"
+                value={inventoryForm.quantity}
+                onChange={e => setInventoryForm({ ...inventoryForm, quantity: Number(e.target.value) })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white"
+                required
+              />
+              <input
+                type="number"
+                placeholder="Custo Unitário R$"
+                value={inventoryForm.unitCost}
+                onChange={e => setInventoryForm({ ...inventoryForm, unitCost: Number(e.target.value) })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-amber-300 font-mono"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="Fornecedor"
+                value={inventoryForm.supplier}
+                onChange={e => setInventoryForm({ ...inventoryForm, supplier: e.target.value })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-white"
+              />
+              <select
+                value={inventoryForm.unit}
+                onChange={e => setInventoryForm({ ...inventoryForm, unit: e.target.value as any })}
+                className="bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-xs text-amber-300 font-bold"
+              >
+                <option value="kg">kg</option>
+                <option value="m">m</option>
+                <option value="m²">m²</option>
+                <option value="unidades">unidades</option>
+                <option value="litros">litros</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => setShowAddInventory(false)} className="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-lg text-xs">Cancelar</button>
+              <button type="submit" className="px-4 py-1 bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" />
+                <span>Salvar</span>
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

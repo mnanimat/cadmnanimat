@@ -11,8 +11,12 @@ import {
   MousePointer,
   PenTool,
   ChevronDown,
-  Sparkles,
-  Maximize2
+  Move,
+  RotateCcw,
+  Maximize,
+  Pipette,
+  Wrench,
+  Shield
 } from 'lucide-react';
 import { ActiveTool, DisplayMode, PlaneType } from '../types/cad';
 
@@ -33,6 +37,8 @@ interface ToolbarProps {
   onOpenExtrudeModal: () => void;
   onOpenRevolveModal: () => void;
   onOpenLoftModal: () => void;
+  onOpenFrameModal: () => void;
+  onOpenPipeMiterModal: () => void;
   onOpenExportModal: () => void;
   onLoadTemplate: (templateId: string) => void;
 }
@@ -54,6 +60,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenExtrudeModal,
   onOpenRevolveModal,
   onOpenLoftModal,
+  onOpenFrameModal,
+  onOpenPipeMiterModal,
   onOpenExportModal,
   onLoadTemplate
 }) => {
@@ -94,6 +102,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               onChange={(e) => onLoadTemplate(e.target.value)}
               className="bg-zinc-900 border border-zinc-700/80 text-cyan-300 text-xs px-3 py-1 pr-7 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500/50 cursor-pointer appearance-none font-medium shadow-sm transition-all"
             >
+              <option value="formula_chassis">Chassi Tubular Baja SAE / Formula</option>
               <option value="airplane_wing">Asa de Avião NACA 2412 (Aerofólio)</option>
               <option value="spur_gear">Engrenagem Cilíndrica Z18 (Mecânica)</option>
               <option value="drone_frame">Chassi Drone FPV 5" (Fibra de Carbono)</option>
@@ -106,12 +115,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       {/* Ribbon Toolbar com Agrupamentos Arredondados */}
       <div className="p-1.5 bg-zinc-900/90 flex items-center gap-2 overflow-x-auto scrollbar-none">
         
-        {/* Agrupamento 1: Seleção e Metrologia */}
+        {/* Agrupamento 1: Seleção e Manipulação Tridimensional (Gizmo) */}
         <div className="flex items-center bg-zinc-950/80 border border-zinc-800 p-1 rounded-xl gap-1 shadow-inner">
           <button
             onClick={() => setActiveTool('select')}
-            title="Ferramenta de Seleção Tridimensional (Atalho: S)"
-            className={`px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium rounded-lg transition-all duration-200 active:scale-95 ${
+            title="Ferramenta de Seleção Tridimensional"
+            className={`px-2.5 py-1.5 flex items-center gap-1 text-xs font-medium rounded-lg transition-all duration-200 active:scale-95 ${
               activeTool === 'select'
                 ? 'bg-sky-600 text-white font-semibold shadow-md shadow-sky-600/30'
                 : 'text-zinc-300 hover:bg-zinc-800/90 hover:text-white'
@@ -122,9 +131,48 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTool('translate')}
+            title="Mover Objeto nos eixos X, Y e Z"
+            className={`px-2.5 py-1.5 flex items-center gap-1 text-xs font-medium rounded-lg transition-all duration-200 active:scale-95 ${
+              activeTool === 'translate'
+                ? 'bg-sky-500 text-slate-950 font-bold shadow-md shadow-sky-500/30'
+                : 'text-zinc-300 hover:bg-zinc-800/90 hover:text-white'
+            }`}
+          >
+            <Move className="w-3.5 h-3.5 text-sky-400" />
+            <span>Mover X,Y,Z</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTool('rotate')}
+            title="Rotacionar Objeto nos eixos X, Y e Z"
+            className={`px-2.5 py-1.5 flex items-center gap-1 text-xs font-medium rounded-lg transition-all duration-200 active:scale-95 ${
+              activeTool === 'rotate'
+                ? 'bg-indigo-500 text-white font-bold shadow-md shadow-indigo-500/30'
+                : 'text-zinc-300 hover:bg-zinc-800/90 hover:text-white'
+            }`}
+          >
+            <RotateCw className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Rotacionar</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTool('scale')}
+            title="Escalar Objeto nos eixos X, Y e Z"
+            className={`px-2.5 py-1.5 flex items-center gap-1 text-xs font-medium rounded-lg transition-all duration-200 active:scale-95 ${
+              activeTool === 'scale'
+                ? 'bg-purple-500 text-white font-bold shadow-md shadow-purple-500/30'
+                : 'text-zinc-300 hover:bg-zinc-800/90 hover:text-white'
+            }`}
+          >
+            <Maximize className="w-3.5 h-3.5 text-purple-400" />
+            <span>Escalar</span>
+          </button>
+
+          <button
             onClick={() => setActiveTool(activeTool === 'measure' ? 'select' : 'measure')}
-            title="Paquímetro Digital & Inspeção (Atalho: M)"
-            className={`px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium rounded-lg transition-all duration-200 active:scale-95 ${
+            title="Paquímetro Digital & Inspeção"
+            className={`px-2.5 py-1.5 flex items-center gap-1 text-xs font-medium rounded-lg transition-all duration-200 active:scale-95 ${
               activeTool === 'measure'
                 ? 'bg-amber-500 text-zinc-950 font-bold shadow-md shadow-amber-500/30'
                 : 'text-zinc-300 hover:bg-zinc-800/90 hover:text-white'
@@ -142,7 +190,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-md shadow-cyan-600/25 transition-all duration-200 active:scale-95"
           >
             <PenTool className="w-3.5 h-3.5" />
-            <span>Esboço Vetorial 2D</span>
+            <span>Esboço 2D/3D</span>
           </button>
 
           <div className="flex items-center gap-1 px-1 border-l border-zinc-800 pl-2">
@@ -163,19 +211,37 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </div>
         </div>
 
-        {/* Agrupamento 3: Modificadores e Operações 3D */}
+        {/* Agrupamento 3: Gerador de Chassis, Tubos e Modificadores 3D */}
         <div className="flex items-center bg-zinc-950/80 border border-zinc-800 p-1 rounded-xl gap-1 shadow-inner">
           <button
-            onClick={onOpenExtrudeModal}
-            className="px-3 py-1.5 text-zinc-300 hover:bg-zinc-800/90 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-200 active:scale-95"
+            onClick={onOpenFrameModal}
+            className="px-3 py-1.5 bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all duration-200 active:scale-95 shadow-sm"
+            title="Gerar tubos de chassi a partir de linhas de esboço com conexões miter"
           >
-            <Box className="w-3.5 h-3.5 text-teal-400" />
-            <span>Extrusão 3D</span>
+            <Wrench className="w-3.5 h-3.5 text-sky-400" />
+            <span>Gerador Tubo/Chassi</span>
+          </button>
+
+          <button
+            onClick={onOpenPipeMiterModal}
+            className="px-3 py-1.5 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all duration-200 active:scale-95 shadow-sm"
+            title="Ferramenta de corte de tubo e junção miter 45 graus"
+          >
+            <Scissors className="w-3.5 h-3.5 text-teal-400" />
+            <span>Corte & Junção</span>
+          </button>
+
+          <button
+            onClick={onOpenExtrudeModal}
+            className="px-2.5 py-1.5 text-zinc-300 hover:bg-zinc-800/90 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-all duration-200 active:scale-95"
+          >
+            <Box className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Extrusão</span>
           </button>
 
           <button
             onClick={onOpenRevolveModal}
-            className="px-3 py-1.5 text-zinc-300 hover:bg-zinc-800/90 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-200 active:scale-95"
+            className="px-2.5 py-1.5 text-zinc-300 hover:bg-zinc-800/90 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-all duration-200 active:scale-95"
           >
             <RotateCw className="w-3.5 h-3.5 text-orange-400" />
             <span>Revolução</span>
@@ -183,10 +249,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
           <button
             onClick={onOpenLoftModal}
-            className="px-3 py-1.5 text-zinc-300 hover:bg-zinc-800/90 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-200 active:scale-95"
+            className="px-2.5 py-1.5 text-zinc-300 hover:bg-zinc-800/90 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-all duration-200 active:scale-95"
           >
             <Combine className="w-3.5 h-3.5 text-purple-400" />
-            <span>Loft Curvo</span>
+            <span>Loft</span>
           </button>
         </div>
 
@@ -194,7 +260,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <div className="flex items-center bg-zinc-950/80 border border-zinc-800 p-1 rounded-xl gap-1 shadow-inner">
           <button
             onClick={() => setShowPlanes(!showPlanes)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-150 ${
+            className={`px-2 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all duration-150 ${
               showPlanes ? 'bg-zinc-800 text-teal-300 font-semibold' : 'text-zinc-400 hover:bg-zinc-800/60'
             }`}
           >
@@ -204,7 +270,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
           <button
             onClick={() => setShowGrid(!showGrid)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-150 ${
+            className={`px-2 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all duration-150 ${
               showGrid ? 'bg-zinc-800 text-teal-300 font-semibold' : 'text-zinc-400 hover:bg-zinc-800/60'
             }`}
           >
@@ -214,12 +280,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
           <button
             onClick={() => setSectionView(!sectionView)}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-150 ${
+            className={`px-2 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all duration-150 ${
               sectionView ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-semibold' : 'text-zinc-400 hover:bg-zinc-800/60'
             }`}
           >
             <Scissors className="w-3.5 h-3.5 text-rose-400" />
-            <span>Corte</span>
+            <span>Corte 3D</span>
           </button>
 
           <div className="relative border-l border-zinc-800 pl-1">
@@ -252,3 +318,4 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     </header>
   );
 };
+

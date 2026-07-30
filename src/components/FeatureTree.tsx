@@ -19,7 +19,9 @@ import {
   Trash2, 
   Folder,
   Sliders,
-  Sparkles
+  Sparkles,
+  Wrench,
+  Scissors
 } from 'lucide-react';
 
 interface FeatureTreeProps {
@@ -185,6 +187,8 @@ export const FeatureTree: React.FC<FeatureTreeProps> = ({
                     {feature.type === 'extrude' && <Box className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />}
                     {feature.type === 'revolve' && <RotateCw className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />}
                     {feature.type === 'loft' && <Combine className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />}
+                    {feature.type === 'frame' && <Wrench className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />}
+                    {feature.type === 'pipe_miter' && <Scissors className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />}
                     <span className="truncate font-medium text-zinc-200">{feature.name}</span>
                   </div>
 

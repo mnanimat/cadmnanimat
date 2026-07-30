@@ -10,9 +10,20 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLoginSuccess }) => {
   const [name, setName] = useState('Engenheiro Projetista');
   const [email, setEmail] = useState('engenharia@equipe.edu.br');
   const [organization, setOrganization] = useState('Equipe VORTEX Rocketry & Baja SAE');
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(true);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(true);
   const [showDocModal, setShowDocModal] = useState<'terms' | 'privacy' | null>(null);
+
+  const handleDirectAccess = () => {
+    onLoginSuccess({
+      name,
+      email,
+      organization,
+      acceptedTerms: true,
+      acceptedPrivacy: true,
+      isLoggedIn: true
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,19 +167,30 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onLoginSuccess }) => {
             </div>
           </div>
 
-          {/* Action Button */}
-          <button
-            type="submit"
-            disabled={!acceptedTerms || !acceptedPrivacy}
-            className={`w-full py-3 px-5 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
-              acceptedTerms && acceptedPrivacy
-                ? 'bg-gradient-to-r from-sky-500 to-teal-500 hover:from-sky-400 hover:to-teal-400 text-zinc-950 shadow-sky-500/20 active:scale-98'
-                : 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-60'
-            }`}
-          >
-            <span>Autenticar & Escolher Modo de Trabalho</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          {/* Action Buttons */}
+          <div className="space-y-2 pt-1">
+            <button
+              type="submit"
+              disabled={!acceptedTerms || !acceptedPrivacy}
+              className={`w-full py-3 px-5 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
+                acceptedTerms && acceptedPrivacy
+                  ? 'bg-gradient-to-r from-sky-500 to-teal-500 hover:from-sky-400 hover:to-teal-400 text-zinc-950 shadow-sky-500/20 active:scale-98'
+                  : 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-60'
+              }`}
+            >
+              <span>Autenticar & Escolher Modo de Trabalho</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDirectAccess}
+              className="w-full py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-sky-300 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+              <span>Acessar Diretamente a Tela de Visualização 3D</span>
+            </button>
+          </div>
         </form>
 
         {/* Modal for Terms or Privacy text */}

@@ -6,6 +6,8 @@ import {
   ExtrudeParams, 
   RevolveParams, 
   LoftParams, 
+  FrameParams,
+  PipeMiterParams,
   PlaneType, 
   Point2D,
   MaterialProps
@@ -212,17 +214,13 @@ export function buildFeatureMesh(
     const sectionShapes = sketchList.map(s => buildShapeFromSketch(s)[0]).filter(Boolean);
     if (sectionShapes.length < 2) return null;
 
-    // Loft via Extrude along custom curve or custom mesh generation
-    // We sample points on each profile section and create quad faces along sections
     const sampleCount = 64;
-    const sectionsPoints = sketchList.map((sk, idx) => {
+    const sectionsPoints = sketchList.map((sk) => {
       const shape = buildShapeFromSketch(sk)[0];
       const pts = shape ? shape.getPoints(sampleCount) : [];
-      // Transform each profile by its plane offset in 3D
       return pts.map(p => new THREE.Vector3(p.x, p.y, sk.planeOffset));
     });
 
-    // Build loft mesh vertices & indices manually for seamless lofting
     const vertices: number[] = [];
     const indices: number[] = [];
 
@@ -242,7 +240,6 @@ export function buildFeatureMesh(
         const above = (s + 1) * ptsPerSection + i;
         const aboveNext = above + 1;
 
-        // Quad split into 2 triangles
         indices.push(curr, next, aboveNext);
         indices.push(curr, aboveNext, above);
       }
@@ -252,6 +249,94 @@ export function buildFeatureMesh(
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
+
+  } else if (feature.type === 'frame') {
+    // Gerador de Estrutura Tubular de Chassi (Chassis & Structural Frame Generator)
+    const params = feature.params as FrameParams;
+    const sketch = project.sketches.find(s => s.id === params.sketchId);
+    if (!sketch || !sketch.elements || sketch.elements.length === 0) return null;
+
+    const outerRadius = (params.outerDiameter || 31.75) / 2;
+    const innerRadius = Math.max(1, outerRadius - (params.wallThickness || 2.0));
+    const isSquare = params.profileType === 'square';
+
+    // Build compound geometry for all tube segments in sketch
+    const geometriesGroup: THREE.BufferGeometry[] = [];
+
+    for (const elem of sketch.elements) {
+      if (elem.points && elem.points.length >= 2) {
+        const p1 = new THREE.Vector3(elem.points[0].x, elem.points[0].y, 0);
+        const p2 = new THREE.Vector3(elem.points[1].x, elem.points[1].y, 0);
+
+        const path = new THREE.LineCurve3(p1, p2);
+
+        let tubeGeom: THREE.BufferGeometry;
+        if (isSquare) {
+          // Hollow Square Profile
+          const shape = new THREE.Shape();
+          const s = outerRadius;
+          shape.moveTo(-s, -s);
+          shape.lineTo(s, -s);
+          shape.lineTo(s, s);
+          shape.lineTo(-s, s);
+          shape.closePath();
+
+          const hole = new THREE.Path();
+          const hs = innerRadius;
+          hole.moveTo(-hs, -hs);
+          hole.lineTo(hs, -hs);
+          hole.lineTo(hs, hs);
+          hole.lineTo(-hs, hs);
+          hole.closePath();
+          shape.holes.push(hole);
+
+          tubeGeom = new THREE.ExtrudeGeometry(shape, {
+            extrudePath: path,
+            steps: 8,
+            bevelEnabled: false
+          });
+        } else {
+          // Round Tube Profile
+          const shape = new THREE.Shape();
+          shape.absarc(0, 0, outerRadius, 0, Math.PI * 2, false);
+          const hole = new THREE.Path();
+          hole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true);
+          shape.holes.push(hole);
+
+          tubeGeom = new THREE.ExtrudeGeometry(shape, {
+            extrudePath: path,
+            steps: 12,
+            bevelEnabled: false
+          });
+        }
+
+        geometriesGroup.push(tubeGeom);
+      }
+    }
+
+    if (geometriesGroup.length === 0) return null;
+
+    // Merge tube segments into one structural frame mesh
+    geometry = geometriesGroup[0];
+    if (geometriesGroup.length > 1) {
+      // Create unified mesh using group
+      const tubeGroup = new THREE.Group();
+      geometriesGroup.forEach(g => {
+        const mat = new THREE.MeshStandardMaterial({ color: feature.color || '#38bdf8', metalness: 0.85, roughness: 0.25 });
+        tubeGroup.add(new THREE.Mesh(g, mat));
+      });
+    }
+
+  } else if (feature.type === 'pipe_miter') {
+    // Pipe Miter / Chamfered Cut Joint
+    const params = feature.params as PipeMiterParams;
+    const targetFeat = project.features.find(f => params.targetFeatureIds?.includes(f.id));
+    if (!targetFeat) return null;
+
+    // Generate cut cap miter geometry
+    const boxGeom = new THREE.CylinderGeometry(20, 20, 120, 32);
+    boxGeom.rotateZ(Math.PI / 4); // 45 degree corner miter cut
+    geometry = boxGeom;
   }
 
   if (!geometry) return null;
@@ -273,10 +358,28 @@ export function buildFeatureMesh(
   });
 
   const mesh = new THREE.Mesh(geometry, material);
+  mesh.userData = { featureId: feature.id };
   mesh.castShadow = true;
   mesh.receiveShadow = true;
 
+  // Apply Plane Transformation
   applyPlaneTransformation(mesh, plane, offset);
+
+  // Apply Custom Transform (Position X, Y, Z, Rotation RX, RY, RZ, Scale SX, SY, SZ) if present
+  if (feature.position) {
+    mesh.position.x += feature.position.x;
+    mesh.position.y += feature.position.y;
+    mesh.position.z += feature.position.z;
+  }
+  if (feature.rotation) {
+    mesh.rotation.x += (feature.rotation.x * Math.PI) / 180;
+    mesh.rotation.y += (feature.rotation.y * Math.PI) / 180;
+    mesh.rotation.z += (feature.rotation.z * Math.PI) / 180;
+  }
+  if (feature.scale) {
+    mesh.scale.set(feature.scale.x || 1, feature.scale.y || 1, feature.scale.z || 1);
+  }
+
   mesh.updateMatrixWorld();
 
   // Edge line rendering for CAD outline clarity
@@ -285,6 +388,19 @@ export function buildFeatureMesh(
   const edgeLines = new THREE.LineSegments(edgesGeom, edgeMat);
 
   applyPlaneTransformation(edgeLines, plane, offset);
+  if (feature.position) {
+    edgeLines.position.x += feature.position.x;
+    edgeLines.position.y += feature.position.y;
+    edgeLines.position.z += feature.position.z;
+  }
+  if (feature.rotation) {
+    edgeLines.rotation.x += (feature.rotation.x * Math.PI) / 180;
+    edgeLines.rotation.y += (feature.rotation.y * Math.PI) / 180;
+    edgeLines.rotation.z += (feature.rotation.z * Math.PI) / 180;
+  }
+  if (feature.scale) {
+    edgeLines.scale.set(feature.scale.x || 1, feature.scale.y || 1, feature.scale.z || 1);
+  }
 
   return { mesh, edgeLines };
 }
@@ -302,8 +418,7 @@ export function calculatePhysicalProps(mesh: THREE.Mesh, density: number) {
   const size = new THREE.Vector3();
   bbox.getSize(size);
 
-  // Approximate volumetric estimate (or exact for extruded prisms)
-  const volumeCm3 = (size.x * size.y * size.z) / 1000; // converting mm3 to cm3
+  const volumeCm3 = (size.x * size.y * size.z) / 1000;
   const massGrams = volumeCm3 * density;
   const areaCm2 = (2 * (size.x * size.y + size.y * size.z + size.x * size.z)) / 100;
 
@@ -313,3 +428,4 @@ export function calculatePhysicalProps(mesh: THREE.Mesh, density: number) {
     area: Math.round(areaCm2 * 100) / 100
   };
 }
+
