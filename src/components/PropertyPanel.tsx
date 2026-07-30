@@ -9,6 +9,7 @@ interface PropertyPanelProps {
   type: 'extrude' | 'revolve' | 'loft' | 'frame' | 'pipe_miter';
   onSave: (feature: CADFeature) => void;
   onClose: () => void;
+  theme?: 'dark' | 'light';
 }
 
 export const PropertyPanel: React.FC<PropertyPanelProps> = ({
@@ -16,8 +17,11 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   sketches,
   type,
   onSave,
-  onClose
+  onClose,
+  theme = 'dark'
 }) => {
+  const isLight = theme === 'light';
+
   const [sketchId, setSketchId] = useState<string>(
     feature?.sketchId || (sketches[0] ? sketches[0].id : '')
   );
@@ -147,11 +151,21 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     }
   };
 
+  const inputClass = isLight
+    ? 'w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-sky-500/50'
+    : 'w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sky-300 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/50';
+
+  const cardClass = isLight
+    ? 'bg-slate-50 p-3.5 rounded-xl border border-slate-300 space-y-3'
+    : 'bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800 space-y-3';
+
   return (
-    <div className="w-96 p-4 space-y-4 text-zinc-200 font-sans text-xs select-none">
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-        <h3 className="font-bold text-sm text-sky-400 flex items-center gap-2">
-          <Wrench className="w-4 h-4 text-sky-400" />
+    <div className={`w-80 sm:w-96 p-4 pb-10 space-y-4 font-sans text-xs select-none max-w-full overflow-y-auto max-h-[calc(100vh-140px)] pr-1 scrollbar-thin scrollbar-thumb-zinc-700 ${
+      isLight ? 'text-slate-800' : 'text-zinc-200'
+    }`}>
+      <div className={`flex items-center justify-between border-b pb-2 ${isLight ? 'border-slate-300' : 'border-zinc-800'}`}>
+        <h3 className="font-bold text-sm text-sky-600 dark:text-sky-400 flex items-center gap-2">
+          <Wrench className="w-4 h-4 text-sky-500" />
           <span>{feature ? 'Editar Recurso CAD' : `Novo Recurso: ${type.toUpperCase()}`}</span>
         </h3>
       </div>
@@ -159,13 +173,15 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
       {/* Seleção do Esboço Base */}
       {type !== 'loft' && type !== 'pipe_miter' && (
         <div className="space-y-1.5">
-          <label className="text-zinc-400 font-semibold text-[11px] uppercase tracking-wider block">
+          <label className={`font-semibold text-[11px] uppercase tracking-wider block ${
+            isLight ? 'text-slate-600' : 'text-zinc-400'
+          }`}>
             Esboço de Origem (Linhas / Percurso):
           </label>
           <select
             value={sketchId}
             onChange={e => setSketchId(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sky-300 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/50 cursor-pointer"
+            className={inputClass}
           >
             {sketches.map(s => (
               <option key={s.id} value={s.id}>
@@ -178,18 +194,18 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
 
       {/* Frame (Gerador de Tubos de Chassi) */}
       {type === 'frame' && (
-        <div className="space-y-3 bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800">
-          <label className="text-sky-300 font-bold text-xs block">Perfil Estrutural do Tubo:</label>
+        <div className={cardClass}>
+          <label className="text-sky-600 dark:text-sky-300 font-bold text-xs block">Perfil Estrutural do Tubo:</label>
           <div className="grid grid-cols-3 gap-1.5">
             {(['round', 'square', 'rectangular'] as const).map(p => (
               <button
                 key={p}
                 type="button"
                 onClick={() => setFrameProfile(p)}
-                className={`py-1.5 px-2 rounded-lg font-semibold text-center border transition-all ${
+                className={`py-1.5 px-2 rounded-lg font-semibold text-center border transition-all cursor-pointer ${
                   frameProfile === p
-                    ? 'bg-sky-500 text-slate-950 border-sky-400 font-bold shadow-sm'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
+                    ? 'bg-sky-600 text-white border-sky-500 font-bold shadow-sm'
+                    : (isLight ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white')
                 }`}
               >
                 {p === 'round' ? 'Redondo' : p === 'square' ? 'Quadrado' : 'Retangular'}
@@ -198,48 +214,46 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           </div>
 
           {frameProfile === 'round' && (
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-zinc-400 text-[10px] uppercase font-bold block mb-1">Diâmetro Externo (mm):</label>
+                <label className={`text-[10px] block mb-1 font-semibold ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Diâmetro Ext. (mm):</label>
                 <input
                   type="number"
-                  step="0.1"
                   value={outerDiameter}
                   onChange={e => setOuterDiameter(Number(e.target.value))}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 text-sky-300 font-mono font-bold"
+                  className={inputClass}
                 />
               </div>
               <div>
-                <label className="text-zinc-400 text-[10px] uppercase font-bold block mb-1">Espessura Parede (mm):</label>
+                <label className={`text-[10px] block mb-1 font-semibold ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Espessura Parede (mm):</label>
                 <input
                   type="number"
-                  step="0.1"
                   value={wallThickness}
                   onChange={e => setWallThickness(Number(e.target.value))}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 text-sky-300 font-mono font-bold"
+                  className={inputClass}
                 />
               </div>
             </div>
           )}
 
-          {frameProfile !== 'round' && (
-            <div className="grid grid-cols-2 gap-2 pt-1">
+          {(frameProfile === 'square' || frameProfile === 'rectangular') && (
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-zinc-400 text-[10px] uppercase font-bold block mb-1">Largura (mm):</label>
+                <label className={`text-[10px] block mb-1 font-semibold ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Largura (mm):</label>
                 <input
                   type="number"
                   value={frameWidth}
                   onChange={e => setFrameWidth(Number(e.target.value))}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 text-sky-300 font-mono font-bold"
+                  className={inputClass}
                 />
               </div>
               <div>
-                <label className="text-zinc-400 text-[10px] uppercase font-bold block mb-1">Altura (mm):</label>
+                <label className={`text-[10px] block mb-1 font-semibold ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Altura (mm):</label>
                 <input
                   type="number"
                   value={frameHeight}
                   onChange={e => setFrameHeight(Number(e.target.value))}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 text-sky-300 font-mono font-bold"
+                  className={inputClass}
                 />
               </div>
             </div>
@@ -251,246 +265,183 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
               id="miter"
               checked={miterJoints}
               onChange={e => setMiterJoints(e.target.checked)}
-              className="accent-sky-400 w-4 h-4 rounded cursor-pointer"
+              className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
             />
-            <label htmlFor="miter" className="text-zinc-300 cursor-pointer font-medium text-xs">
-              Junções em Miter a 45° nas Esquinas
+            <label htmlFor="miter" className={`font-semibold cursor-pointer ${isLight ? 'text-slate-800' : 'text-zinc-200'}`}>
+              Gerar Junções com Corte Esquadria 45°
             </label>
           </div>
         </div>
       )}
 
-      {/* Pipe Miter (Corte & Junção) */}
-      {type === 'pipe_miter' && (
-        <div className="space-y-3 bg-zinc-900/60 p-3.5 rounded-xl border border-zinc-800">
-          <div className="flex justify-between items-center font-bold">
-            <span className="text-zinc-300">Ângulo de Corte Miter (°):</span>
-            <span className="text-teal-400 font-mono text-sm">{cutAngle}°</span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={90}
-            value={cutAngle}
-            onChange={e => setCutAngle(Number(e.target.value))}
-            className="w-full accent-teal-400 cursor-pointer h-2 bg-zinc-800 rounded-lg"
-          />
+      {/* Extrusão */}
+      {type === 'extrude' && (
+        <div className={cardClass}>
           <div>
-            <label className="text-zinc-400 text-[10px] uppercase font-bold block mb-1">Offset do Corte (mm):</label>
+            <label className={`text-[11px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Profundidade de Extrusão (mm):</label>
             <input
               type="number"
-              value={miterOffset}
-              onChange={e => setMiterOffset(Number(e.target.value))}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 text-teal-300 font-mono font-bold"
+              value={depth}
+              onChange={e => setDepth(Number(e.target.value))}
+              className={inputClass}
             />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="symm"
+              checked={symmetric}
+              onChange={e => setSymmetric(e.target.checked)}
+              className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
+            />
+            <label htmlFor="symm" className={`font-semibold cursor-pointer ${isLight ? 'text-slate-800' : 'text-zinc-200'}`}>Extrusão Simétrica</label>
           </div>
         </div>
       )}
 
-      {/* Seleção de Múltiplos Esboços para Loft */}
+      {/* Revolução */}
+      {type === 'revolve' && (
+        <div className={cardClass}>
+          <label className={`text-[11px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Ângulo de Revolução (Graus °):</label>
+          <input
+            type="number"
+            value={angle}
+            onChange={e => setAngle(Number(e.target.value))}
+            className={inputClass}
+          />
+        </div>
+      )}
+
+      {/* Loft */}
       {type === 'loft' && (
-        <div className="space-y-1.5">
-          <label className="text-zinc-400 font-semibold text-[11px] uppercase tracking-wider block">
-            Selecione os Esboços para Interpolação:
-          </label>
-          <div className="max-h-40 overflow-y-auto space-y-1.5 bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800">
+        <div className={cardClass}>
+          <label className={`text-[11px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Selecione os Perfis de Esboço:</label>
+          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
             {sketches.map(s => {
-              const isChecked = selectedLoftSketches.includes(s.id);
+              const isSelected = selectedLoftSketches.includes(s.id);
               return (
-                <div
+                <button
                   key={s.id}
+                  type="button"
                   onClick={() => toggleLoftSketch(s.id)}
-                  className={`p-2 rounded-lg border flex items-center justify-between cursor-pointer transition-all ${
-                    isChecked 
-                      ? 'bg-purple-500/15 border-purple-500/50 text-purple-300 font-bold' 
-                      : 'border-zinc-800 text-zinc-400 hover:bg-zinc-800/60'
+                  className={`w-full p-2 rounded-xl text-left border flex items-center justify-between font-semibold cursor-pointer ${
+                    isSelected
+                      ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
+                      : (isLight ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white')
                   }`}
                 >
                   <span>{s.name} (Plano {s.plane})</span>
-                  <input type="checkbox" checked={isChecked} readOnly className="accent-purple-500 rounded cursor-pointer" />
-                </div>
+                  {isSelected && <Check className="w-4 h-4" />}
+                </button>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* Profundidade para Extrusão */}
-      {type === 'extrude' && (
-        <div className="space-y-3 bg-zinc-900/50 p-3.5 rounded-xl border border-zinc-800/80">
-          <div className="flex justify-between items-center font-bold">
-            <span className="text-zinc-300">Profundidade (mm):</span>
-            <span className="text-teal-400 font-mono text-sm">{depth} mm</span>
+      {/* Pipe Miter */}
+      {type === 'pipe_miter' && (
+        <div className={cardClass}>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={`text-[10px] block mb-1 font-semibold ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Ângulo de Corte (°):</label>
+              <input
+                type="number"
+                value={cutAngle}
+                onChange={e => setCutAngle(Number(e.target.value))}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={`text-[10px] block mb-1 font-semibold ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Offset Recuo (mm):</label>
+              <input
+                type="number"
+                value={miterOffset}
+                onChange={e => setMiterOffset(Number(e.target.value))}
+                className={inputClass}
+              />
+            </div>
           </div>
-          <input
-            type="range"
-            min={1}
-            max={500}
-            value={depth}
-            onChange={e => setDepth(Number(e.target.value))}
-            className="w-full accent-teal-400 cursor-pointer h-2 bg-zinc-800 rounded-lg"
-          />
-          <div className="flex items-center gap-2">
+        </div>
+      )}
+
+      {/* Posição Tridimensional (XYZ) */}
+      <div className={cardClass}>
+        <div className="flex items-center gap-1.5 font-bold text-sky-600 dark:text-sky-400">
+          <Move className="w-3.5 h-3.5" />
+          <span>Posição XYZ (Transladação em mm):</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="text-[10px] text-sky-500 block font-mono font-bold">X:</label>
             <input
               type="number"
-              value={depth}
-              onChange={e => setDepth(Number(e.target.value))}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-teal-300 font-mono font-bold"
+              value={position.x}
+              onChange={e => setPosition({ ...position, x: Number(e.target.value) })}
+              className={inputClass}
             />
           </div>
-
-          <div className="flex items-center gap-2 pt-1">
+          <div>
+            <label className="text-[10px] text-teal-500 block font-mono font-bold">Y:</label>
             <input
-              type="checkbox"
-              id="sym"
-              checked={symmetric}
-              onChange={e => setSymmetric(e.target.checked)}
-              className="accent-teal-400 w-4 h-4 rounded cursor-pointer"
+              type="number"
+              value={position.y}
+              onChange={e => setPosition({ ...position, y: Number(e.target.value) })}
+              className={inputClass}
             />
-            <label htmlFor="sym" className="text-zinc-300 cursor-pointer font-medium text-xs">
-              Extrusão Simétrica Bilateral
-            </label>
           </div>
-        </div>
-      )}
-
-      {/* Ângulo de Revolução */}
-      {type === 'revolve' && (
-        <div className="space-y-3 bg-zinc-900/50 p-3.5 rounded-xl border border-zinc-800/80">
-          <div className="flex justify-between items-center font-bold">
-            <span className="text-zinc-300">Ângulo de Revolução (°):</span>
-            <span className="text-orange-400 font-mono text-sm">{angle}°</span>
-          </div>
-          <input
-            type="range"
-            min={10}
-            max={360}
-            value={angle}
-            onChange={e => setAngle(Number(e.target.value))}
-            className="w-full accent-orange-400 cursor-pointer h-2 bg-zinc-800 rounded-lg"
-          />
-        </div>
-      )}
-
-      {/* Painel de Transformação Numérica (X, Y, Z - Mover, Rotacionar, Escalar) */}
-      <div className="space-y-2 bg-zinc-900/70 p-3 rounded-xl border border-zinc-800">
-        <label className="text-sky-400 font-bold text-xs flex items-center gap-1.5">
-          <Move className="w-3.5 h-3.5" />
-          <span>Transformações Tridimensionais (Eixos X, Y, Z)</span>
-        </label>
-        
-        {/* Posição */}
-        <div>
-          <span className="text-zinc-400 text-[10px] uppercase font-bold block mb-1">Posição (mm):</span>
-          <div className="grid grid-cols-3 gap-1.5">
-            <div>
-              <span className="text-red-400 text-[9px] font-mono block">X:</span>
-              <input
-                type="number"
-                value={position.x}
-                onChange={e => setPosition({ ...position, x: Number(e.target.value) })}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-200 font-mono text-[11px]"
-              />
-            </div>
-            <div>
-              <span className="text-green-400 text-[9px] font-mono block">Y:</span>
-              <input
-                type="number"
-                value={position.y}
-                onChange={e => setPosition({ ...position, y: Number(e.target.value) })}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-200 font-mono text-[11px]"
-              />
-            </div>
-            <div>
-              <span className="text-blue-400 text-[9px] font-mono block">Z:</span>
-              <input
-                type="number"
-                value={position.z}
-                onChange={e => setPosition({ ...position, z: Number(e.target.value) })}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-200 font-mono text-[11px]"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Rotação */}
-        <div>
-          <span className="text-zinc-400 text-[10px] uppercase font-bold block mb-1">Rotação (Graus °):</span>
-          <div className="grid grid-cols-3 gap-1.5">
-            <div>
-              <span className="text-red-400 text-[9px] font-mono block">RX:</span>
-              <input
-                type="number"
-                value={rotation.x}
-                onChange={e => setRotation({ ...rotation, x: Number(e.target.value) })}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-200 font-mono text-[11px]"
-              />
-            </div>
-            <div>
-              <span className="text-green-400 text-[9px] font-mono block">RY:</span>
-              <input
-                type="number"
-                value={rotation.y}
-                onChange={e => setRotation({ ...rotation, y: Number(e.target.value) })}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-200 font-mono text-[11px]"
-              />
-            </div>
-            <div>
-              <span className="text-blue-400 text-[9px] font-mono block">RZ:</span>
-              <input
-                type="number"
-                value={rotation.z}
-                onChange={e => setRotation({ ...rotation, z: Number(e.target.value) })}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-200 font-mono text-[11px]"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Escala */}
-        <div>
-          <span className="text-zinc-400 text-[10px] uppercase font-bold block mb-1">Escala (Fator 1.0 = 100%):</span>
-          <div className="grid grid-cols-3 gap-1.5">
-            <div>
-              <span className="text-red-400 text-[9px] font-mono block">SX:</span>
-              <input
-                type="number"
-                step="0.1"
-                value={scale.x}
-                onChange={e => setScale({ ...scale, x: Number(e.target.value) })}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-200 font-mono text-[11px]"
-              />
-            </div>
-            <div>
-              <span className="text-green-400 text-[9px] font-mono block">SY:</span>
-              <input
-                type="number"
-                step="0.1"
-                value={scale.y}
-                onChange={e => setScale({ ...scale, y: Number(e.target.value) })}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-200 font-mono text-[11px]"
-              />
-            </div>
-            <div>
-              <span className="text-blue-400 text-[9px] font-mono block">SZ:</span>
-              <input
-                type="number"
-                step="0.1"
-                value={scale.z}
-                onChange={e => setScale({ ...scale, z: Number(e.target.value) })}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-200 font-mono text-[11px]"
-              />
-            </div>
+          <div>
+            <label className="text-[10px] text-amber-500 block font-mono font-bold">Z:</label>
+            <input
+              type="number"
+              value={position.z}
+              onChange={e => setPosition({ ...position, z: Number(e.target.value) })}
+              className={inputClass}
+            />
           </div>
         </div>
       </div>
 
-      {/* Seleção de Material de Engenharia */}
-      <div className="space-y-1.5 pt-2 border-t border-zinc-800">
-        <label className="text-zinc-400 font-semibold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-          <span>Material de Engenharia & Acabamento:</span>
-        </label>
+      {/* Rotação Tridimensional */}
+      <div className={cardClass}>
+        <div className="flex items-center gap-1.5 font-bold text-indigo-600 dark:text-indigo-400">
+          <RotateCw className="w-3.5 h-3.5" />
+          <span>Rotação Tridimensional (Graus °):</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="text-[10px] text-indigo-500 block font-mono font-bold">Rx:</label>
+            <input
+              type="number"
+              value={rotation.x}
+              onChange={e => setRotation({ ...rotation, x: Number(e.target.value) })}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-indigo-500 block font-mono font-bold">Ry:</label>
+            <input
+              type="number"
+              value={rotation.y}
+              onChange={e => setRotation({ ...rotation, y: Number(e.target.value) })}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-indigo-500 block font-mono font-bold">Rz:</label>
+            <input
+              type="number"
+              value={rotation.z}
+              onChange={e => setRotation({ ...rotation, z: Number(e.target.value) })}
+              className={inputClass}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Engenharia do Material */}
+      <div className={cardClass}>
+        <label className={`text-[11px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Especificação de Material:</label>
         <select
           value={materialId}
           onChange={e => {
@@ -498,35 +449,35 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
             const mat = PRESET_MATERIALS.find(m => m.id === e.target.value);
             if (mat) setColor(mat.color);
           }}
-          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-teal-300 font-medium focus:outline-none cursor-pointer"
+          className={inputClass}
         >
           {PRESET_MATERIALS.map(m => (
             <option key={m.id} value={m.id}>
-              {m.name} (Densidade: {m.density} g/cm³)
+              {m.name} ({m.density} g/cm³)
             </option>
           ))}
         </select>
       </div>
 
-      {/* Rodapé com Botões Arredondados */}
-      <div className="pt-2 border-t border-zinc-800 flex justify-end gap-2.5">
+      {/* Action Buttons */}
+      <div className="flex items-center gap-2 pt-2">
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-all active:scale-95 cursor-pointer"
+          className={`w-1/2 py-2 rounded-xl font-bold transition cursor-pointer ${
+            isLight ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+          }`}
         >
           Cancelar
         </button>
         <button
           type="button"
           onClick={handleSave}
-          className="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-sky-600/30 transition-all active:scale-95 cursor-pointer"
+          className="w-1/2 py-2 bg-gradient-to-r from-sky-600 to-teal-600 hover:from-sky-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-md transition cursor-pointer"
         >
-          <Check className="w-4 h-4" />
-          <span>Aplicar Parâmetros</span>
+          Salvar Operação
         </button>
       </div>
     </div>
   );
 };
-

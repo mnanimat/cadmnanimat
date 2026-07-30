@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CADProject, 
   ActiveTool, 
@@ -18,18 +18,34 @@ import { FeatureTree } from './components/FeatureTree';
 import { CADViewport } from './components/CADViewport';
 import { SketchCanvas } from './components/SketchCanvas';
 import { PropertyPanel } from './components/PropertyPanel';
+import { TransformInspector } from './components/TransformInspector';
 import { MeasurementTool } from './components/MeasurementTool';
 import { ExportModal } from './components/ExportModal';
 import { CFDSimulationWindow } from './components/CFDSimulationWindow';
 import { PartsLibraryModal } from './components/PartsLibraryModal';
+import { DrawingSheetModal } from './components/DrawingSheetModal';
 import { BottomTabs } from './components/BottomTabs';
 import { DraggableWindow } from './components/DraggableWindow';
 import { LoginModal } from './components/LoginModal';
 import { ModeSelectorModal } from './components/ModeSelectorModal';
 import { TeamManagementModal } from './components/TeamManagementModal';
-import { Layers, Ruler, Sliders, Download, Maximize2, Minimize2, Move, Box, Users, Compass, Rocket, ShieldCheck, Sparkles, Wind, Database } from 'lucide-react';
+import { ShortcutsModal } from './components/ShortcutsModal';
+import { AboutModal } from './components/AboutModal';
+import { useAutoSave } from './hooks/useAutoSave';
+import { Layers, Ruler, Sliders, Download, Maximize2, Minimize2, Move, Box, Users, Compass, Rocket, ShieldCheck, Sparkles, Wind, Database, Keyboard, Info, Save, CheckCircle2 } from 'lucide-react';
 
 export default function App() {
+  // Theme Management ('dark' | 'light')
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('cad_theme');
+    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+  });
+
+  const handleSetTheme = (newTheme: 'dark' | 'light') => {
+    setTheme(newTheme);
+    localStorage.setItem('cad_theme', newTheme);
+  };
+
   // Authentication & Engineering Modes State
   const [userSession, setUserSession] = useState<UserSession | null>({
     name: 'Engenheiro Projetista',
@@ -42,22 +58,42 @@ export default function App() {
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showModeSelector, setShowModeSelector] = useState<boolean>(false);
   const [showTeamManagement, setShowTeamManagement] = useState<boolean>(false);
-  const [activeEngineeringTitle, setActiveEngineeringTitle] = useState<string>('Foguete Experimental (3km Apogeu)');
+  const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
+  const [showAboutModal, setShowAboutModal] = useState<boolean>(false);
 
-  const [project, setProject] = useState<CADProject>(CAD_TEMPLATES[0]); // Starts with Rocket template
+  // Auto-restore project state and active engineering title from auto-save
+  const [activeEngineeringTitle, setActiveEngineeringTitle] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('cadmnanimat_autosave');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.title) return parsed.title;
+      }
+    } catch (e) {}
+    return 'Foguete Experimental (3km Apogeu)';
+  });
+
+  const [project, setProject] = useState<CADProject>(() => {
+    try {
+      const saved = localStorage.getItem('cadmnanimat_autosave');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.project && parsed.project.id && Array.isArray(parsed.project.features)) {
+          return parsed.project;
+        }
+      }
+    } catch (e) {}
+    return CAD_TEMPLATES[0];
+  });
+
+  // Auto-save hook running every 30 seconds
+  const { lastSaved, isSaved, saveNow } = useAutoSave(project, activeEngineeringTitle, 30000);
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('edges');
   const [showPlanes, setShowPlanes] = useState<boolean>(true);
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const [sectionView, setSectionView] = useState<boolean>(false);
   const [activePlane, setActivePlane] = useState<PlaneType>('Top');
-
-  // Canvas Mode: 'fullscreen' | 'windowed' | 'minimized'
-  const [canvasMode, setCanvasMode] = useState<'fullscreen' | 'windowed' | 'minimized'>('fullscreen');
-
-  // Multi-document / Part Studio tabs
-  const [tabs, setTabs] = useState<string[]>(['Estúdio Principal 3D', 'Análise de Materiais & Propulsão']);
-  const [activeTab, setActiveTab] = useState<string>('Estúdio Principal 3D');
 
   // Modals & Panels State
   const [isSketching, setIsSketching] = useState<boolean>(false);
@@ -67,16 +103,193 @@ export default function App() {
   const [editingFeature, setEditingFeature] = useState<CADFeature | null>(null);
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | undefined>(undefined);
 
+  // Undo / Redo Project History
+  const [history, setHistory] = useState<CADProject[]>([CAD_TEMPLATES[0]]);
+  const [historyIndex, setHistoryIndex] = useState<number>(0);
+
+  const pushProjectState = (newProject: CADProject) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(newProject);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+    setProject(newProject);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const prevIndex = historyIndex - 1;
+      setHistoryIndex(prevIndex);
+      setProject(history[prevIndex]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const nextIndex = historyIndex + 1;
+      setHistoryIndex(nextIndex);
+      setProject(history[nextIndex]);
+    }
+  };
+
+  const handleNewProject = () => {
+    const blankProject: CADProject = {
+      id: `proj_${Date.now()}`,
+      name: 'Novo Projeto CAD Vazio',
+      activePlane: 'Top',
+      sketches: [],
+      features: [],
+      parts: [
+        {
+          id: `p_blank`,
+          name: 'Peça Principal',
+          featureIds: [],
+          color: '#00f0ff',
+          material: { id: 'alu', name: 'Alumínio 6061-T6', density: 2.7, color: '#e0e0e0', metalness: 0.8, roughness: 0.2 },
+          visible: true,
+          volume: 0,
+          mass: 0,
+          surfaceArea: 0
+        }
+      ]
+    };
+    pushProjectState(blankProject);
+  };
+
+  const handleClearProject = () => {
+    if (window.confirm('Tem certeza de que deseja limpar todos os recursos e esboços do projeto atual?')) {
+      const cleared = {
+        ...project,
+        sketches: [],
+        features: []
+      };
+      pushProjectState(cleared);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedFeatureId) {
+      const updated = {
+        ...project,
+        features: project.features.filter(f => f.id !== selectedFeatureId)
+      };
+      setSelectedFeatureId(undefined);
+      pushProjectState(updated);
+    } else if (project.features.length > 0) {
+      const updated = {
+        ...project,
+        features: project.features.slice(0, -1)
+      };
+      pushProjectState(updated);
+    }
+  };
+
+  const handleResetLayout = () => {
+    setShowFeatureTree(true);
+    setFocusedWindow('tree');
+  };
+
+  // Measurement Snap Mode
+  const [snapMode, setSnapMode] = useState<'vertex' | 'edge' | 'face' | 'any'>('any');
+
+  // Keyboard Shortcuts Handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+
+      if ((e.ctrlKey || e.metaKey) && key === 'z') {
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleRedo();
+        } else {
+          e.preventDefault();
+          handleUndo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && key === 'y') {
+        e.preventDefault();
+        handleRedo();
+      } else if ((e.ctrlKey || e.metaKey) && key === 's') {
+        e.preventDefault();
+        setShowExportModal(true);
+      } else if (key === 'g' || key === 'm' || key === 'w') {
+        setActiveTool('translate');
+      } else if (key === 'r' || key === 'e') {
+        setActiveTool('rotate');
+      } else if (key === 's') {
+        setActiveTool('scale');
+      } else if (key === 'v') {
+        setActiveTool('select');
+      } else if (key === 'p' || key === 'q') {
+        setActiveTool('measure');
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedFeatureId) {
+          const updated = {
+            ...project,
+            features: project.features.filter(f => f.id !== selectedFeatureId)
+          };
+          pushProjectState(updated);
+          setSelectedFeatureId(undefined);
+        }
+      } else if (e.key === 'Escape') {
+        setActiveTool('select');
+        setIsSketching(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [historyIndex, history, selectedFeatureId, project]);
+
+  // Canvas Mode: 'fullscreen' | 'windowed' | 'minimized'
+  const [canvasMode, setCanvasMode] = useState<'fullscreen' | 'windowed' | 'minimized'>('fullscreen');
+
+  // Multi-document / Part Studio tabs
+  const [tabs, setTabs] = useState<string[]>(['Estúdio Principal 3D', 'Análise de Materiais & Propulsão', 'Prancha Técnica A4']);
+  const [activeTab, setActiveTab] = useState<string>('Estúdio Principal 3D');
+  const [showDrawingSheetModal, setShowDrawingSheetModal] = useState<boolean>(false);
+
+  const handleAddTab = () => {
+    const newIndex = tabs.length + 1;
+    const newTabName = `Estúdio de Peça ${newIndex}`;
+    setTabs([...tabs, newTabName]);
+    setActiveTab(newTabName);
+  };
+
+  const handleDeleteTab = (tabName: string) => {
+    const updatedTabs = tabs.filter(t => t !== tabName);
+    if (updatedTabs.length === 0) {
+      const defaultTab = 'Estúdio Principal 3D';
+      setTabs([defaultTab]);
+      setActiveTab(defaultTab);
+    } else {
+      setTabs(updatedTabs);
+      if (activeTab === tabName) {
+        setActiveTab(updatedTabs[updatedTabs.length - 1]);
+      }
+    }
+  };
+
+  const handleDeleteActivePage = () => {
+    if (window.confirm(`Tem certeza de que deseja excluir a página atual "${activeTab}"?`)) {
+      handleDeleteTab(activeTab);
+    }
+  };
+
   const handleUpdateFeatureTransform = (featureId: string, transform: { position?: Point3D; rotation?: Point3D; scale?: Point3D }) => {
-    setProject(prev => ({
-      ...prev,
-      features: prev.features.map(f => f.id === featureId ? {
+    const updated = {
+      ...project,
+      features: project.features.map(f => f.id === featureId ? {
         ...f,
         position: { ...(f.position || { x: 0, y: 0, z: 0 }), ...transform.position },
         rotation: { ...(f.rotation || { x: 0, y: 0, z: 0 }), ...transform.rotation },
         scale: { ...(f.scale || { x: 1, y: 1, z: 1 }), ...transform.scale }
       } : f)
-    }));
+    };
+    setProject(updated);
   };
 
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
@@ -102,12 +315,13 @@ export default function App() {
   });
 
   const handleImportStandardPart = (sketch: Sketch2D, feature: CADFeature, part: CADPart) => {
-    setProject(prev => ({
-      ...prev,
-      sketches: [...prev.sketches, sketch],
-      features: [...prev.features, feature],
-      parts: [...prev.parts, part]
-    }));
+    const updated = {
+      ...project,
+      sketches: [...project.sketches, sketch],
+      features: [...project.features, feature],
+      parts: [...project.parts, part]
+    };
+    pushProjectState(updated);
   };
 
   // Focus Z-index management
@@ -116,7 +330,7 @@ export default function App() {
   // Login handler
   const handleLoginSuccess = (session: UserSession) => {
     setUserSession(session);
-    setShowModeSelector(true); // Right after login, present the work mode selector window
+    setShowModeSelector(true);
   };
 
   // Rocket mode handler
@@ -125,7 +339,7 @@ export default function App() {
     const customizedProject: CADProject = JSON.parse(JSON.stringify(rocketTemplate));
     customizedProject.name = `Foguete (${config.apogeeTarget} Apogeu) - ${config.fuelType}`;
     
-    setProject(customizedProject);
+    pushProjectState(customizedProject);
     setActiveEngineeringTitle(`Foguete Aeroespacial (${config.apogeeTarget} Apogeu - ${config.propulsionType.toUpperCase()})`);
     setShowModeSelector(false);
   };
@@ -140,7 +354,7 @@ export default function App() {
     const customizedProject: CADProject = JSON.parse(JSON.stringify(tmpl));
     customizedProject.name = `${config.title} [${config.powertrain.toUpperCase()}]`;
 
-    setProject(customizedProject);
+    pushProjectState(customizedProject);
     setActiveEngineeringTitle(`${config.title} (${config.powertrain})`);
     setShowModeSelector(false);
   };
@@ -149,7 +363,7 @@ export default function App() {
   const handleLoadTemplate = (templateId: string) => {
     const tmpl = CAD_TEMPLATES.find(t => t.id === templateId);
     if (tmpl) {
-      setProject(JSON.parse(JSON.stringify(tmpl)));
+      pushProjectState(JSON.parse(JSON.stringify(tmpl)));
     }
   };
 
@@ -174,46 +388,45 @@ export default function App() {
   };
 
   const handleSaveSketch = (updatedSketch: Sketch2D) => {
-    setProject(prev => {
-      const exists = prev.sketches.some(s => s.id === updatedSketch.id);
-      let updatedSketches = [];
-      if (exists) {
-        updatedSketches = prev.sketches.map(s => s.id === updatedSketch.id ? updatedSketch : s);
-      } else {
-        updatedSketches = [...prev.sketches, updatedSketch];
-      }
-      return {
-        ...prev,
-        sketches: updatedSketches
-      };
-    });
+    const exists = project.sketches.some(s => s.id === updatedSketch.id);
+    let updatedSketches = [];
+    if (exists) {
+      updatedSketches = project.sketches.map(s => s.id === updatedSketch.id ? updatedSketch : s);
+    } else {
+      updatedSketches = [...project.sketches, updatedSketch];
+    }
+    const updated = {
+      ...project,
+      sketches: updatedSketches
+    };
+    pushProjectState(updated);
     setIsSketching(false);
     setEditingSketch(null);
   };
 
   // Feature History Mutations
   const handleSaveFeature = (savedFeature: CADFeature) => {
-    setProject(prev => {
-      const exists = prev.features.some(f => f.id === savedFeature.id);
-      let updatedFeatures = [];
-      if (exists) {
-        updatedFeatures = prev.features.map(f => f.id === savedFeature.id ? savedFeature : f);
-      } else {
-        updatedFeatures = [...prev.features, savedFeature];
-      }
-      return {
-        ...prev,
-        features: updatedFeatures
-      };
-    });
+    const exists = project.features.some(f => f.id === savedFeature.id);
+    let updatedFeatures = [];
+    if (exists) {
+      updatedFeatures = project.features.map(f => f.id === savedFeature.id ? savedFeature : f);
+    } else {
+      updatedFeatures = [...project.features, savedFeature];
+    }
+
+    const updated = {
+      ...project,
+      features: updatedFeatures
+    };
+    pushProjectState(updated);
     setPropertyModalType(null);
     setEditingFeature(null);
   };
 
-  const handleDeleteFeature = (featureId: string) => {
+  const handleToggleSketchVisibility = (sketchId: string) => {
     setProject(prev => ({
       ...prev,
-      features: prev.features.filter(f => f.id !== featureId)
+      sketches: prev.sketches.map(s => s.id === sketchId ? { ...s, visible: !s.visible } : s)
     }));
   };
 
@@ -224,37 +437,21 @@ export default function App() {
     }));
   };
 
-  const handleToggleSketchVisibility = (sketchId: string) => {
-    setProject(prev => ({
-      ...prev,
-      sketches: prev.sketches.map(s => s.id === sketchId ? { ...s, visible: !s.visible } : s)
-    }));
+  const handleDeleteFeature = (featureId: string) => {
+    const updated = {
+      ...project,
+      features: project.features.filter(f => f.id !== featureId)
+    };
+    pushProjectState(updated);
   };
 
-  const handleAddTab = () => {
-    const newName = `Estúdio ${tabs.length + 1}`;
-    setTabs(prev => [...prev, newName]);
-    setActiveTab(newName);
-  };
+  const isLight = theme === 'light';
 
   return (
-    <div className="w-screen h-screen flex flex-col bg-[#1e1e1e] font-sans text-[#cccccc] overflow-hidden select-none">
-      
-      {/* 1. LOGIN & TERMS MODAL */}
-      {showLoginModal && (
-        <LoginModal onLoginSuccess={(session) => { handleLoginSuccess(session); setShowLoginModal(false); }} />
-      )}
-
-      {/* 2. WORK MODE SELECTOR MODAL */}
-      {userSession && showModeSelector && (
-        <ModeSelectorModal
-          onSelectRocketMode={handleSelectRocketMode}
-          onSelectVehicleMode={handleSelectVehicleMode}
-          onClose={() => setShowModeSelector(false)}
-        />
-      )}
-
-      {/* Top Ribbon Toolbar */}
+    <div className={`flex flex-col h-screen overflow-hidden select-none font-sans transition-colors ${
+      isLight ? 'bg-slate-100 text-slate-900' : 'bg-zinc-950 text-zinc-100'
+    }`}>
+      {/* Upper Main Toolbar */}
       <Toolbar
         activeTool={activeTool}
         setActiveTool={setActiveTool}
@@ -268,6 +465,8 @@ export default function App() {
         setSectionView={setSectionView}
         activePlane={activePlane}
         setActivePlane={setActivePlane}
+        theme={theme}
+        setTheme={handleSetTheme}
         onOpenNewSketch={handleOpenNewSketch}
         onOpenExtrudeModal={() => { setEditingFeature(null); setPropertyModalType('extrude'); setFocusedWindow('property'); }}
         onOpenRevolveModal={() => { setEditingFeature(null); setPropertyModalType('revolve'); setFocusedWindow('property'); }}
@@ -278,179 +477,141 @@ export default function App() {
         onOpenCFDModal={() => { setShowCFDModal(true); setFocusedWindow('cfd'); }}
         onOpenPartsLibraryModal={() => { setShowPartsLibraryModal(true); setFocusedWindow('parts'); }}
         onLoadTemplate={handleLoadTemplate}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={historyIndex > 0}
+        canRedo={historyIndex < history.length - 1}
+        onNewProject={handleNewProject}
+        onClearProject={handleClearProject}
+        onToggleFeatureTree={() => setShowFeatureTree(prev => !prev)}
+        onOpenTeamModal={() => { setShowTeamManagement(true); setFocusedWindow('team'); }}
+        onOpenModeModal={() => setShowModeSelector(true)}
+        onOpenLoginModal={() => setShowLoginModal(true)}
+        onShowKeyboardShortcuts={() => { setShowShortcutsModal(true); setFocusedWindow('shortcuts'); }}
+        onShowAboutModal={() => { setShowAboutModal(true); setFocusedWindow('about'); }}
+        onResetLayout={handleResetLayout}
+        onDeleteSelected={handleDeleteSelected}
+        onOpenDrawingSheet={() => { setShowDrawingSheetModal(true); setFocusedWindow('drawing'); }}
+        onDeleteActivePage={handleDeleteActivePage}
       />
 
-      {/* Secondary Quick Action Bar for Engineering Mode & Team Management */}
-      {userSession && (
-        <div className="bg-zinc-950 px-4 py-1.5 border-b border-zinc-800/80 flex items-center justify-between text-xs">
-          
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowModeSelector(true)}
-              className="px-3 py-1 bg-gradient-to-r from-sky-500/20 to-teal-500/20 hover:from-sky-500/30 hover:to-teal-500/30 border border-sky-500/40 text-sky-200 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition"
-            >
-              <Compass className="w-3.5 h-3.5 text-sky-400" />
-              <span>Modo de Engenharia:</span>
-              <span className="text-white font-mono">{activeEngineeringTitle}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setShowTeamManagement(true); setFocusedWindow('team'); }}
-              className="px-3 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-teal-300 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer transition"
-            >
-              <Users className="w-3.5 h-3.5 text-teal-400" />
-              <span>Equipe, Gastos & Materiais</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3 text-[11px] text-zinc-400">
-            <button
-              type="button"
-              onClick={() => setShowLoginModal(true)}
-              className="flex items-center gap-1 bg-zinc-900 hover:bg-zinc-800 px-2.5 py-0.5 rounded-lg border border-zinc-800 transition cursor-pointer"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{userSession.name}</span>
-              <span className="text-zinc-500">• {userSession.organization}</span>
-            </button>
-          </div>
-
-        </div>
-      )}
-
-      {/* Main Workspace Area */}
-      <div className="flex-1 relative w-full h-full overflow-hidden bg-zinc-950">
+      {/* Center 3D CAD Canvas and Floating Tool Windows */}
+      <div className="flex-1 relative overflow-hidden flex">
         
-        {/* TAB 1: 3D CAD MODELING VIEWPORT STUDIO */}
-        {activeTab !== 'Análise de Materiais & Propulsão' && (
-          <div className="absolute inset-0 w-full h-full z-0">
-            <CADViewport
-              project={project}
-              displayMode={displayMode}
-              showPlanes={showPlanes}
-              showGrid={showGrid}
-              sectionView={sectionView}
-              activePlane={activePlane}
-              activeTool={activeTool}
-              selectedFeatureId={selectedFeatureId}
-              cfdConfig={cfdConfig}
-              onSelectPlane={setActivePlane}
-              onSelectFeature={(id) => setSelectedFeatureId(id)}
-              onUpdateFeatureTransform={handleUpdateFeatureTransform}
-              isMeasuring={activeTool === 'measure'}
-              onMeasureSelect={(res) => setMeasurementResult(res)}
-            />
+        {/* Canvas Center Stage */}
+        <div className="flex-1 h-full w-full relative">
+          <CADViewport
+            project={project}
+            displayMode={displayMode}
+            showPlanes={showPlanes}
+            showGrid={showGrid}
+            sectionView={sectionView}
+            activePlane={activePlane}
+            activeTool={activeTool}
+            selectedFeatureId={selectedFeatureId}
+            cfdConfig={cfdConfig}
+            snapMode={snapMode}
+            onSelectPlane={setActivePlane}
+            onSelectFeature={(id) => setSelectedFeatureId(id)}
+            onUpdateFeatureTransform={handleUpdateFeatureTransform}
+            onMeasureSelect={(res) => setMeasurementResult(res)}
+            isMeasuring={activeTool === 'measure'}
+            theme={theme}
+          />
 
-            {/* Viewport Floating Status Bar */}
-            <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-zinc-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-zinc-800/90 shadow-2xl text-xs font-sans">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="font-bold text-zinc-100">{project.name}</span>
-              <span className="text-zinc-500">•</span>
-              <span className="text-sky-300 font-mono text-[11px]">{project.parts.length} peças / {project.features.length} operações</span>
+          {/* Top Bar Floating Status Overlay */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 hidden md:flex items-center gap-3">
+            <div className={`px-4 py-1.5 rounded-full border shadow-2xl backdrop-blur-md flex items-center gap-2.5 text-xs font-medium ${
+              isLight
+                ? 'bg-white/95 border-slate-300 text-slate-800'
+                : 'bg-zinc-950/80 border-zinc-800/80 text-zinc-200'
+            }`}>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-sky-500 font-bold">{activeEngineeringTitle}</span>
+                <span className="text-zinc-500">|</span>
+                <span className="font-mono text-emerald-500 font-bold">{project.name}</span>
+              </div>
             </div>
+
+            {/* Auto-Save Indicator Badge */}
+            <button
+              onClick={saveNow}
+              title="Clique para salvar o estado atual do projeto imediatamente no localStorage (Salvamento Automático a cada 30s ativo)"
+              className={`px-3 py-1.5 rounded-full border shadow-lg backdrop-blur-md flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition active:scale-95 ${
+                isLight
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                  : 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/60'
+              }`}
+            >
+              <Save className="w-3.5 h-3.5 text-emerald-400" />
+              <span>
+                {isSaved
+                  ? lastSaved
+                    ? `Salvo às ${lastSaved.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+                    : 'Auto-Salvo (30s)'
+                  : 'Salvando...'}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setShowModeSelector(true)}
+              className="px-3 py-1.5 bg-gradient-to-r from-teal-600 to-sky-600 hover:from-teal-500 hover:to-sky-500 text-white rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 cursor-pointer transition active:scale-95"
+              title="Trocar Modo de Engenharia (Baja / Foguete / Drone)"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>Modos</span>
+            </button>
           </div>
+        </div>
+
+        {/* Modal Window: Authentication / Profile Login */}
+        {showLoginModal && (
+          <LoginModal
+            onSuccess={handleLoginSuccess}
+            onClose={() => setShowLoginModal(false)}
+          />
         )}
 
-        {/* TAB 2: ENGINEERING MATERIALS & PROPULSION ANALYSIS STUDIO */}
-        {activeTab === 'Análise de Materiais & Propulsão' && (
-          <div className="absolute inset-0 w-full h-full z-10 bg-zinc-950 p-6 overflow-y-auto font-sans text-xs select-none space-y-6">
-            <div className="max-w-5xl mx-auto space-y-6">
-              
-              <div className="bg-gradient-to-r from-sky-950/60 via-zinc-900 to-teal-950/60 p-6 rounded-3xl border border-sky-500/30 shadow-2xl flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-sky-400" />
-                    Estúdio de Análise de Materiais, Massa & Propulsão
-                  </h2>
-                  <p className="text-xs text-zinc-400 mt-1">
-                    Cálculos paramétricos em tempo real baseados nas geometrias CAD 3D do projeto <span className="text-sky-300 font-bold">{project.name}</span>.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab(tabs[0] || 'Estúdio Principal 3D')}
-                  className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer shadow-lg"
-                >
-                  <Box className="w-4 h-4" />
-                  <span>Voltar para Modelagem 3D</span>
-                </button>
-              </div>
+        {/* Modal Window: Engineering Mode Selector */}
+        {showModeSelector && (
+          <ModeSelectorModal
+            onSelectRocketMode={handleSelectRocketMode}
+            onSelectVehicleMode={handleSelectVehicleMode}
+            onClose={() => setShowModeSelector(false)}
+          />
+        )}
 
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-zinc-900/90 rounded-2xl border border-zinc-800">
-                  <span className="text-[10px] text-zinc-400 block font-bold uppercase">Massa Total Calculada</span>
-                  <span className="text-xl font-bold font-mono text-sky-400">
-                    {(project.parts.reduce((a, b) => a + b.mass, 0) / 1000).toFixed(2)} kg
-                  </span>
-                  <span className="text-[10px] text-zinc-500 block mt-1">Densidade média: 1.85 g/cm³</span>
-                </div>
+        {/* Floating Movable Window: Keyboard Shortcuts */}
+        {showShortcutsModal && (
+          <DraggableWindow
+            id="window-shortcuts"
+            title="Guia Rápido de Atalhos de Teclado"
+            icon={<Keyboard className="w-4 h-4 text-amber-500" />}
+            defaultPosition={{ x: Math.max(20, Math.floor(window.innerWidth / 2) - 240), y: 60 }}
+            zIndex={focusedWindow === 'shortcuts' ? 35 : 25}
+            onFocus={() => setFocusedWindow('shortcuts')}
+            onClose={() => setShowShortcutsModal(false)}
+            theme={theme}
+          >
+            <ShortcutsModal onClose={() => setShowShortcutsModal(false)} theme={theme} />
+          </DraggableWindow>
+        )}
 
-                <div className="p-4 bg-zinc-900/90 rounded-2xl border border-zinc-800">
-                  <span className="text-[10px] text-zinc-400 block font-bold uppercase">Volume 3D Acumulado</span>
-                  <span className="text-xl font-bold font-mono text-teal-300">
-                    {project.parts.reduce((a, b) => a + b.volume, 0).toLocaleString('pt-BR')} cm³
-                  </span>
-                  <span className="text-[10px] text-zinc-500 block mt-1">Baseado nos sketches extrudados</span>
-                </div>
-
-                <div className="p-4 bg-zinc-900/90 rounded-2xl border border-zinc-800">
-                  <span className="text-[10px] text-zinc-400 block font-bold uppercase">Área Superficial Total</span>
-                  <span className="text-xl font-bold font-mono text-amber-300">
-                    {project.parts.reduce((a, b) => a + b.surfaceArea, 0).toLocaleString('pt-BR')} cm²
-                  </span>
-                  <span className="text-[10px] text-zinc-500 block mt-1">Resistência ao arrasto aerodinâmico</span>
-                </div>
-
-                <div className="p-4 bg-zinc-900/90 rounded-2xl border border-zinc-800">
-                  <span className="text-[10px] text-zinc-400 block font-bold uppercase">Fator de Segurança (FOS)</span>
-                  <span className="text-xl font-bold font-mono text-emerald-400">
-                    2.45 (Seguro)
-                  </span>
-                  <span className="text-[10px] text-zinc-500 block mt-1">Alumínio 7075-T6 & Carbono</span>
-                </div>
-              </div>
-
-              {/* Subsystems Breakdown Table */}
-              <div className="p-5 bg-zinc-900/80 rounded-2xl border border-zinc-800 space-y-4">
-                <h3 className="font-bold text-zinc-200 text-sm flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-sky-400" />
-                  Especificações dos Componentes e Materiais Atribuidos
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs text-zinc-300 border-collapse">
-                    <thead>
-                      <tr className="border-b border-zinc-800 text-zinc-400 font-bold">
-                        <th className="py-2 px-3">Peça / Conjunto</th>
-                        <th className="py-2 px-3">Material Atribuído</th>
-                        <th className="py-2 px-3">Densidade</th>
-                        <th className="py-2 px-3">Massa Est. (g)</th>
-                        <th className="py-2 px-3">Status de Tensão</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {project.parts.map((part) => (
-                        <tr key={part.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition">
-                          <td className="py-2.5 px-3 font-bold text-zinc-100">{part.name}</td>
-                          <td className="py-2.5 px-3 text-sky-300">{part.material.name}</td>
-                          <td className="py-2.5 px-3 font-mono">{part.material.density} g/cm³</td>
-                          <td className="py-2.5 px-3 font-mono text-teal-300">{part.mass.toLocaleString('pt-BR')} g</td>
-                          <td className="py-2.5 px-3">
-                            <span className="bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-md font-bold text-[10px]">
-                              Aprovado (Von Mises OK)
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-            </div>
-          </div>
+        {/* Floating Movable Window: About CADMNAnimat */}
+        {showAboutModal && (
+          <DraggableWindow
+            id="window-about"
+            title="Sobre o CADMNAnimat v1.0.0"
+            icon={<Info className="w-4 h-4 text-teal-500" />}
+            defaultPosition={{ x: Math.max(20, Math.floor(window.innerWidth / 2) - 260), y: 50 }}
+            zIndex={focusedWindow === 'about' ? 35 : 25}
+            onFocus={() => setFocusedWindow('about')}
+            onClose={() => setShowAboutModal(false)}
+            theme={theme}
+          >
+            <AboutModal onClose={() => setShowAboutModal(false)} theme={theme} />
+          </DraggableWindow>
         )}
 
         {/* Movable Window 1: Feature Tree (Estrutura de Modelagem) */}
@@ -463,6 +624,7 @@ export default function App() {
             zIndex={focusedWindow === 'tree' ? 30 : 20}
             onFocus={() => setFocusedWindow('tree')}
             onClose={() => setShowFeatureTree(false)}
+            theme={theme}
           >
             <FeatureTree
               project={project}
@@ -478,6 +640,7 @@ export default function App() {
               }}
               onSelectSketchToEdit={handleEditExistingSketch}
               onSelectPartMaterial={() => {}}
+              theme={theme}
             />
           </DraggableWindow>
         )}
@@ -494,6 +657,7 @@ export default function App() {
             zIndex={focusedWindow === 'team' ? 35 : 20}
             onFocus={() => setFocusedWindow('team')}
             onClose={() => setShowTeamManagement(false)}
+            theme={theme}
           >
             <TeamManagementModal onClose={() => setShowTeamManagement(false)} />
           </DraggableWindow>
@@ -509,10 +673,14 @@ export default function App() {
             zIndex={focusedWindow === 'measure' ? 30 : 20}
             onFocus={() => setFocusedWindow('measure')}
             onClose={() => { setActiveTool('select'); setMeasurementResult(null); }}
+            theme={theme}
           >
             <MeasurementTool
               measurement={measurementResult}
               project={project}
+              snapMode={snapMode}
+              onSnapModeChange={(mode) => setSnapMode(mode)}
+              onClearMeasurement={() => setMeasurementResult(null)}
             />
           </DraggableWindow>
         )}
@@ -533,6 +701,7 @@ export default function App() {
             zIndex={focusedWindow === 'property' ? 30 : 20}
             onFocus={() => setFocusedWindow('property')}
             onClose={() => { setPropertyModalType(null); setEditingFeature(null); }}
+            theme={theme}
           >
             <PropertyPanel
               type={propertyModalType}
@@ -540,6 +709,7 @@ export default function App() {
               sketches={project.sketches}
               onSave={handleSaveFeature}
               onClose={() => { setPropertyModalType(null); setEditingFeature(null); }}
+              theme={theme}
             />
           </DraggableWindow>
         )}
@@ -554,10 +724,12 @@ export default function App() {
             zIndex={focusedWindow === 'export' ? 30 : 20}
             onFocus={() => setFocusedWindow('export')}
             onClose={() => setShowExportModal(false)}
+            theme={theme}
           >
             <ExportModal
               project={project}
               onClose={() => setShowExportModal(false)}
+              onOpenDrawingSheet={() => { setShowDrawingSheetModal(true); setFocusedWindow('drawing'); }}
             />
           </DraggableWindow>
         )}
@@ -572,6 +744,7 @@ export default function App() {
             zIndex={focusedWindow === 'cfd' ? 30 : 20}
             onFocus={() => setFocusedWindow('cfd')}
             onClose={() => setShowCFDModal(false)}
+            theme={theme}
           >
             <CFDSimulationWindow
               project={project}
@@ -592,10 +765,56 @@ export default function App() {
             zIndex={focusedWindow === 'parts' ? 30 : 20}
             onFocus={() => setFocusedWindow('parts')}
             onClose={() => setShowPartsLibraryModal(false)}
+            theme={theme}
           >
             <PartsLibraryModal
               onImportPart={handleImportStandardPart}
               onClose={() => setShowPartsLibraryModal(false)}
+            />
+          </DraggableWindow>
+        )}
+
+        {/* Movable Window 8: 3D Transform Inspector (Mover / Rotacionar / Escalar com Medidas Exatas) */}
+        {(['translate', 'rotate', 'scale'].includes(activeTool) || selectedFeatureId) && (
+          <DraggableWindow
+            id="window-transform-inspector"
+            title="Controle Preciso de Transformação 3D (Medidas Exatas)"
+            icon={<Move className="w-4 h-4 text-amber-400 animate-pulse" />}
+            defaultPosition={{ x: Math.max(20, window.innerWidth - 380), y: 80 }}
+            zIndex={focusedWindow === 'transform' ? 35 : 22}
+            onFocus={() => setFocusedWindow('transform')}
+            onClose={() => { setActiveTool('select'); }}
+            theme={theme}
+          >
+            <TransformInspector
+              project={project}
+              selectedFeatureId={selectedFeatureId}
+              activeTool={activeTool}
+              onSelectFeature={(id) => setSelectedFeatureId(id)}
+              onChangeTool={(tool) => setActiveTool(tool)}
+              onUpdateTransform={handleUpdateFeatureTransform}
+              theme={theme}
+            />
+          </DraggableWindow>
+        )}
+
+        {/* Movable Window 9: Technical Drawing Sheet Generator A4/A3 */}
+        {showDrawingSheetModal && (
+          <DraggableWindow
+            id="window-drawing-sheet"
+            title="Detalhamento Técnico de Engenharia (Prancha A4 / A3)"
+            icon={<Rocket className="w-4 h-4 text-amber-400" />}
+            defaultPosition={{ x: Math.max(10, Math.floor(window.innerWidth / 2) - 500), y: 20 }}
+            width={1020}
+            zIndex={focusedWindow === 'drawing' ? 35 : 24}
+            onFocus={() => setFocusedWindow('drawing')}
+            onClose={() => setShowDrawingSheetModal(false)}
+            theme={theme}
+          >
+            <DrawingSheetModal
+              project={project}
+              onClose={() => setShowDrawingSheetModal(false)}
+              theme={theme}
             />
           </DraggableWindow>
         )}
@@ -605,20 +824,30 @@ export default function App() {
           <button
             type="button"
             onClick={() => { setShowFeatureTree(true); setFocusedWindow('tree'); }}
-            className="absolute top-4 left-4 z-20 px-3 py-2 bg-zinc-950/90 border border-zinc-800 text-sky-400 hover:text-white rounded-xl shadow-xl flex items-center gap-2 text-xs font-bold transition-all cursor-pointer backdrop-blur-md"
+            className={`absolute top-4 left-4 z-20 px-3 py-2 border text-sky-500 rounded-xl shadow-xl flex items-center gap-2 text-xs font-bold transition-all cursor-pointer backdrop-blur-md ${
+              isLight
+                ? 'bg-white/90 border-slate-300 hover:bg-slate-100'
+                : 'bg-zinc-950/90 border-zinc-800 hover:text-white'
+            }`}
           >
-            <Layers className="w-4 h-4 text-sky-400" />
+            <Layers className="w-4 h-4 text-sky-500" />
             <span>Exibir Árvore 3D</span>
           </button>
         )}
       </div>
 
-      {/* 2D Sketch Overlay (When sketching on plane) */}
+      {/* 2D / 3D Sketch Overlay (When sketching on plane or 3D region) */}
       {isSketching && editingSketch && (
         <SketchCanvas
           sketch={editingSketch}
           onSaveSketch={handleSaveSketch}
           onCancel={() => { setIsSketching(false); setEditingSketch(null); }}
+          onExtrudeDirectly={(sk) => {
+            handleSaveSketch(sk);
+            setEditingFeature(null);
+            setPropertyModalType('extrude');
+            setFocusedWindow('property');
+          }}
         />
       )}
 
@@ -628,9 +857,10 @@ export default function App() {
         setActiveTab={setActiveTab}
         tabs={tabs}
         onAddTab={handleAddTab}
+        onDeleteTab={handleDeleteTab}
+        onOpenDrawingSheet={() => { setShowDrawingSheetModal(true); setFocusedWindow('drawing'); }}
+        theme={theme}
       />
     </div>
   );
 }
-
-

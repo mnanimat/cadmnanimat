@@ -99,7 +99,7 @@ export const ModeSelectorModal: React.FC<ModeSelectorModalProps> = ({
         </div>
 
         {/* Domains Selector Cards */}
-        <div className="p-6 overflow-y-auto space-y-6">
+        <div className="p-6 pb-12 overflow-y-auto space-y-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             
             {/* 1. Foguete */}

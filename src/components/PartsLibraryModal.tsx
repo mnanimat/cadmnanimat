@@ -63,7 +63,7 @@ export const PartsLibraryModal: React.FC<PartsLibraryModalProps> = ({
   };
 
   return (
-    <div className="w-[680px] text-zinc-200 font-sans text-xs select-none space-y-4 p-4">
+    <div className="w-[680px] max-w-full text-zinc-200 font-sans text-xs select-none space-y-4 p-4 pb-10 max-h-[85vh] overflow-y-auto">
       
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-sky-950/80 via-zinc-900 to-teal-950/80 p-3.5 rounded-2xl border border-sky-500/30 flex items-center justify-between">

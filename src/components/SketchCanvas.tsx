@@ -27,7 +27,14 @@ interface SketchCanvasProps {
   onCancel: () => void;
 }
 
-export const SketchCanvas: React.FC<SketchCanvasProps> = ({ sketch, onSaveSketch, onCancel }) => {
+interface SketchCanvasProps {
+  sketch: Sketch2D;
+  onSaveSketch: (updatedSketch: Sketch2D) => void;
+  onCancel: () => void;
+  onExtrudeDirectly?: (updatedSketch: Sketch2D) => void;
+}
+
+export const SketchCanvas: React.FC<SketchCanvasProps> = ({ sketch, onSaveSketch, onCancel, onExtrudeDirectly }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [elements, setElements] = useState<SketchElement[]>(sketch.elements || []);
   const [activeDrawTool, setActiveDrawTool] = useState<ActiveTool>('sketch_line');
@@ -37,6 +44,8 @@ export const SketchCanvas: React.FC<SketchCanvasProps> = ({ sketch, onSaveSketch
   const [airfoilChord, setAirfoilChord] = useState<number>(150);
   const [gridSnap, setGridSnap] = useState<boolean>(true);
   const [gridSize, setGridSize] = useState<number>(10);
+  const [coincidenceSnap, setCoincidenceSnap] = useState<boolean>(true);
+  const [snappedVertex, setSnappedVertex] = useState<Point2D | null>(null);
   const [sketchMode3D, setSketchMode3D] = useState<boolean>(false);
   const [activePlane, setActivePlane] = useState<'XY' | 'XZ' | 'YZ' | '3D Space'>('XY');
 
@@ -44,6 +53,17 @@ export const SketchCanvas: React.FC<SketchCanvasProps> = ({ sketch, onSaveSketch
   const [inputLength, setInputLength] = useState<string>('100');
   const [inputAngle, setInputAngle] = useState<string>('0');
   const [inputDepthZ, setInputDepthZ] = useState<string>('0');
+
+  // Collect all vertex points from existing elements for coincidence snapping
+  const getAllVertices = (): Point2D[] => {
+    const pts: Point2D[] = [];
+    for (const el of elements) {
+      if (el.points) {
+        pts.push(...el.points);
+      }
+    }
+    return pts;
+  };
 
   // Calculates real-time length (mm) and angle (deg) based on start point and current mouse position
   const currentDx = drawingPoints.length > 0 ? mousePos.x - drawingPoints[0].x : 0;
@@ -70,6 +90,29 @@ export const SketchCanvas: React.FC<SketchCanvasProps> = ({ sketch, onSaveSketch
     let rawX = e.clientX - rect.left - centerX;
     let rawY = -(e.clientY - rect.top - centerY);
 
+    // 1. Check Coincidence Snap (Conexão por Coincidência em Vértices Existentes)
+    if (coincidenceSnap) {
+      const vertices = getAllVertices();
+      let closest: Point2D | null = null;
+      let minDist = 18; // 18px snap radius
+
+      for (const v of vertices) {
+        const dist = Math.hypot(v.x - rawX, v.y - rawY);
+        if (dist < minDist) {
+          minDist = dist;
+          closest = v;
+        }
+      }
+
+      if (closest) {
+        setSnappedVertex(closest);
+        return closest;
+      }
+    }
+
+    setSnappedVertex(null);
+
+    // 2. Check Grid Snap if not snapped to a vertex
     if (gridSnap) {
       rawX = Math.round(rawX / gridSize) * gridSize;
       rawY = Math.round(rawY / gridSize) * gridSize;
@@ -256,6 +299,29 @@ export const SketchCanvas: React.FC<SketchCanvasProps> = ({ sketch, onSaveSketch
       }
     }
 
+    // Indicator of Snapped Vertex for Coincidence Connection
+    if (snappedVertex) {
+      const svCanvas = toCanvas(snappedVertex);
+      ctx.strokeStyle = '#10b981';
+      ctx.fillStyle = '#10b981';
+      ctx.lineWidth = 2.5;
+      
+      // Outer ring
+      ctx.beginPath();
+      ctx.arc(svCanvas.x, svCanvas.y, 8, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Inner dot
+      ctx.beginPath();
+      ctx.arc(svCanvas.x, svCanvas.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Label text
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('Coincidência (Vértice)', svCanvas.x + 12, svCanvas.y - 6);
+    }
+
     // Desenha elemento em progresso com cotas dinâmicas de comprimento (mm) e ângulo (°)
     if (drawingPoints.length > 0) {
       const p1 = toCanvas(drawingPoints[0]);
@@ -405,6 +471,21 @@ export const SketchCanvas: React.FC<SketchCanvasProps> = ({ sketch, onSaveSketch
 
         {/* Botões de Ação Final */}
         <div className="flex items-center gap-2">
+          {/* Toggle Snap de Coincidência */}
+          <button
+            type="button"
+            onClick={() => setCoincidenceSnap(!coincidenceSnap)}
+            title={coincidenceSnap ? 'Coincidência Ativa: Conecta linhas automaticamente em vértices existentes' : 'Posicionamento Livre: Insere pontos sem travar em vértices'}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+              coincidenceSnap 
+                ? 'bg-emerald-950/80 border-emerald-500/80 text-emerald-300 shadow-md' 
+                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${coincidenceSnap ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'}`} />
+            <span>{coincidenceSnap ? 'Coincidência ON' : 'Posicionamento Livre'}</span>
+          </button>
+
           <button
             onClick={() => setGridSnap(!gridSnap)}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border text-xs font-medium transition-all ${
@@ -412,16 +493,27 @@ export const SketchCanvas: React.FC<SketchCanvasProps> = ({ sketch, onSaveSketch
             }`}
           >
             <Grid className="w-3.5 h-3.5" />
-            <span>SNAP (10mm)</span>
+            <span>GRID SNAP</span>
           </button>
 
           <button
             onClick={onCancel}
-            className="flex items-center gap-1.5 px-4 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium rounded-xl transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium rounded-xl transition-all cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
             <span>Cancelar</span>
           </button>
+
+          {onExtrudeDirectly && (
+            <button
+              onClick={() => onExtrudeDirectly({ ...sketch, elements })}
+              className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-teal-600 to-sky-600 hover:from-teal-500 hover:to-sky-500 text-white font-bold rounded-xl shadow-lg transition-all cursor-pointer"
+              title="Salvar esboço e abrir painel de Extrusão 3D para gerar sólido"
+            >
+              <Box className="w-3.5 h-3.5 text-amber-300" />
+              <span>Extruir Região 3D</span>
+            </button>
+          )}
 
           <button
             onClick={handleFinish}

@@ -178,6 +178,7 @@ export interface MeasurementResult {
   angle?: number;
   area?: number;
   volume?: number;
+  snapType?: 'vertex' | 'edge' | 'face' | 'any';
 }
 
 export interface CFDConfig {

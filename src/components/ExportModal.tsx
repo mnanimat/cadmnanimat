@@ -2,14 +2,15 @@ import React from 'react';
 import * as THREE from 'three';
 import { CADProject } from '../types/cad';
 import { exportToSTL, exportToOBJ, exportToDXF, exportCADProjectJSON } from '../utils/exporters';
-import { Download, FileCode, Printer, Layers, Box } from 'lucide-react';
+import { Download, FileCode, Printer, Layers, Box, FileText } from 'lucide-react';
 
 interface ExportModalProps {
   project: CADProject;
   onClose: () => void;
+  onOpenDrawingSheet?: () => void;
 }
 
-export const ExportModal: React.FC<ExportModalProps> = ({ project, onClose }) => {
+export const ExportModal: React.FC<ExportModalProps> = ({ project, onClose, onOpenDrawingSheet }) => {
   const handleExportSTL = () => {
     const scene = new THREE.Scene();
     exportToSTL(scene, `${project.name.toLowerCase().replace(/\s+/g, '_')}.stl`);
@@ -30,6 +31,27 @@ export const ExportModal: React.FC<ExportModalProps> = ({ project, onClose }) =>
 
   return (
     <div className="w-96 p-4 space-y-2.5 text-zinc-200 font-sans text-xs select-none">
+      {/* Prancha Técnica A4 / A3 */}
+      {onOpenDrawingSheet && (
+        <div 
+          onClick={() => { onClose(); onOpenDrawingSheet(); }}
+          className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/50 hover:border-amber-400 cursor-pointer transition-all duration-200 flex items-center justify-between group hover:bg-amber-900/40 shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-500/20 rounded-xl border border-amber-500/30 group-hover:bg-amber-500/30 transition-all">
+              <FileText className="w-5 h-5 text-amber-400 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="font-bold text-amber-200 group-hover:text-amber-100 transition-colors">
+                Prancha Técnica A4 / A3 (PDF / Imprimir)
+              </h3>
+              <p className="text-[11px] text-amber-300/80">Vistas Ortográficas, Isométrica, Selo e Cotas</p>
+            </div>
+          </div>
+          <FileText className="w-4 h-4 text-amber-400 group-hover:text-amber-300 transition-colors" />
+        </div>
+      )}
+
       {/* Formato STL */}
       <div 
         onClick={handleExportSTL}

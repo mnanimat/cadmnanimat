@@ -34,6 +34,7 @@ interface FeatureTreeProps {
   onEditFeature: (feature: CADFeature) => void;
   onSelectSketchToEdit: (sketch: Sketch2D) => void;
   onSelectPartMaterial: (part: CADPart) => void;
+  theme?: 'dark' | 'light';
 }
 
 export const FeatureTree: React.FC<FeatureTreeProps> = ({
@@ -45,33 +46,46 @@ export const FeatureTree: React.FC<FeatureTreeProps> = ({
   onDeleteFeature,
   onEditFeature,
   onSelectSketchToEdit,
-  onSelectPartMaterial
+  onSelectPartMaterial,
+  theme = 'dark'
 }) => {
   const [openGeomSection, setOpenGeomSection] = useState(true);
   const [openSketchesSection, setOpenSketchesSection] = useState(true);
   const [openFeaturesSection, setOpenFeaturesSection] = useState(true);
   const [openPartsSection, setOpenPartsSection] = useState(true);
 
+  const isLight = theme === 'light';
+
   return (
-    <div className="w-72 p-2 space-y-2 text-zinc-300 font-sans text-xs select-none">
+    <div className={`w-72 p-2 space-y-2 font-sans text-xs select-none ${
+      isLight ? 'text-slate-800' : 'text-zinc-300'
+    }`}>
       {/* Seção 1: Referências Geométricas e Planos */}
-      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-xl overflow-hidden shadow-sm">
+      <div className={`border rounded-xl overflow-hidden shadow-sm ${
+        isLight ? 'bg-white border-slate-300' : 'bg-zinc-900/80 border-zinc-800/80'
+      }`}>
         <button
           type="button"
           onClick={() => setOpenGeomSection(!openGeomSection)}
-          className="w-full px-3 py-2 flex items-center justify-between text-xs font-semibold text-zinc-200 bg-zinc-900 border-b border-zinc-800/60 hover:bg-zinc-800/50 transition cursor-pointer"
+          className={`w-full px-3 py-2 flex items-center justify-between text-xs font-semibold border-b transition cursor-pointer ${
+            isLight 
+              ? 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200' 
+              : 'bg-zinc-900 border-zinc-800/60 text-zinc-200 hover:bg-zinc-800/50'
+          }`}
         >
           <div className="flex items-center gap-2">
-            <Folder className="w-3.5 h-3.5 text-amber-400" />
+            <Folder className="w-3.5 h-3.5 text-amber-500" />
             <span>Origem & Planos</span>
           </div>
-          {openGeomSection ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
+          {openGeomSection ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
         </button>
 
         {openGeomSection && (
           <div className="p-1.5 space-y-1 text-xs">
-            <div className="px-2.5 py-1 flex items-center gap-2 text-zinc-400 font-mono text-[11px]">
-              <CircleDot className="w-3 h-3 text-sky-400" />
+            <div className={`px-2.5 py-1 flex items-center gap-2 font-mono text-[11px] ${
+              isLight ? 'text-slate-500' : 'text-zinc-400'
+            }`}>
+              <CircleDot className="w-3 h-3 text-sky-500" />
               <span>Origem (0, 0, 0)</span>
             </div>
 
@@ -82,18 +96,24 @@ export const FeatureTree: React.FC<FeatureTreeProps> = ({
                 onClick={() => onSelectPlane(plane)}
                 className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-all duration-150 cursor-pointer ${
                   activePlane === plane
-                    ? 'bg-sky-500/15 text-sky-300 font-bold border border-sky-500/40 shadow-sm'
-                    : 'hover:bg-zinc-800/60 text-zinc-300'
+                    ? (isLight 
+                        ? 'bg-sky-100 text-sky-900 font-bold border border-sky-400' 
+                        : 'bg-sky-500/15 text-sky-300 font-bold border border-sky-500/40 shadow-sm')
+                    : (isLight 
+                        ? 'hover:bg-slate-100 text-slate-700' 
+                        : 'hover:bg-zinc-800/60 text-zinc-300')
                 }`}
               >
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${
-                    plane === 'Top' ? 'bg-sky-400' : plane === 'Front' ? 'bg-teal-400' : 'bg-orange-400'
+                    plane === 'Top' ? 'bg-sky-500' : plane === 'Front' ? 'bg-teal-500' : 'bg-orange-500'
                   }`} />
                   <span>Plano {plane === 'Top' ? 'Superior' : plane === 'Front' ? 'Frontal' : 'Lateral'}</span>
                 </div>
                 {activePlane === plane && (
-                  <span className="text-[9px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded-md font-mono uppercase font-bold">
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-mono uppercase font-bold ${
+                    isLight ? 'bg-sky-200 text-sky-900' : 'bg-sky-500/20 text-sky-300'
+                  }`}>
                     Ativo
                   </span>
                 )}
@@ -104,33 +124,43 @@ export const FeatureTree: React.FC<FeatureTreeProps> = ({
       </div>
 
       {/* Seção 2: Esboços Vetoriais 2D */}
-      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-xl overflow-hidden shadow-sm">
+      <div className={`border rounded-xl overflow-hidden shadow-sm ${
+        isLight ? 'bg-white border-slate-300' : 'bg-zinc-900/80 border-zinc-800/80'
+      }`}>
         <button
           type="button"
           onClick={() => setOpenSketchesSection(!openSketchesSection)}
-          className="w-full px-3 py-2 flex items-center justify-between text-xs font-semibold text-zinc-200 bg-zinc-900 border-b border-zinc-800/60 hover:bg-zinc-800/50 transition cursor-pointer"
+          className={`w-full px-3 py-2 flex items-center justify-between text-xs font-semibold border-b transition cursor-pointer ${
+            isLight 
+              ? 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200' 
+              : 'bg-zinc-900 border-zinc-800/60 text-zinc-200 hover:bg-zinc-800/50'
+          }`}
         >
           <div className="flex items-center gap-2">
-            <PenTool className="w-3.5 h-3.5 text-amber-400" />
+            <PenTool className="w-3.5 h-3.5 text-amber-500" />
             <span>Esboços 2D ({project.sketches.length})</span>
           </div>
-          {openSketchesSection ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
+          {openSketchesSection ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
         </button>
 
         {openSketchesSection && (
           <div className="p-1.5 space-y-1 text-xs font-sans">
             {project.sketches.length === 0 ? (
-              <p className="px-3 py-2 text-[11px] text-zinc-500 italic">Nenhum esboço 2D cadastrado.</p>
+              <p className="px-3 py-2 text-[11px] text-slate-400 italic">Nenhum esboço 2D cadastrado.</p>
             ) : (
               project.sketches.map((sketch) => (
                 <div
                   key={sketch.id}
-                  className="group px-2.5 py-1.5 rounded-lg hover:bg-zinc-800/80 flex items-center justify-between text-zinc-300 transition-all border border-transparent hover:border-zinc-700/50"
+                  className={`group px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-all border ${
+                    isLight 
+                      ? 'hover:bg-slate-100 border-transparent hover:border-slate-300 text-slate-800' 
+                      : 'hover:bg-zinc-800/80 border-transparent hover:border-zinc-700/50 text-zinc-300'
+                  }`}
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <PenTool className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                    <span className="truncate font-medium text-zinc-200">{sketch.name}</span>
-                    <span className="text-[10px] text-zinc-500 font-mono">({sketch.plane})</span>
+                    <PenTool className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                    <span className={`truncate font-bold ${isLight ? 'text-slate-900' : 'text-zinc-200'}`}>{sketch.name}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">({sketch.plane})</span>
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -138,7 +168,7 @@ export const FeatureTree: React.FC<FeatureTreeProps> = ({
                       type="button"
                       onClick={() => onSelectSketchToEdit(sketch)}
                       title="Editar Esboço Vetorial"
-                      className="p-1 hover:bg-zinc-700/80 text-zinc-400 hover:text-sky-300 rounded-md transition-colors cursor-pointer"
+                      className="p-1 hover:bg-slate-200 dark:hover:bg-zinc-700/80 text-slate-500 dark:text-zinc-400 hover:text-sky-600 rounded-md transition-colors cursor-pointer"
                     >
                       <Sliders className="w-3.5 h-3.5" />
                     </button>
@@ -146,9 +176,9 @@ export const FeatureTree: React.FC<FeatureTreeProps> = ({
                       type="button"
                       onClick={() => onToggleSketchVisibility(sketch.id)}
                       title="Ocultar/Exibir Esboço"
-                      className="p-1 hover:bg-zinc-700/80 text-zinc-400 hover:text-white rounded-md transition-colors cursor-pointer"
+                      className="p-1 hover:bg-slate-200 dark:hover:bg-zinc-700/80 text-slate-500 dark:text-zinc-400 rounded-md transition-colors cursor-pointer"
                     >
-                      {sketch.visible ? <Eye className="w-3.5 h-3.5 text-teal-400" /> : <EyeOff className="w-3.5 h-3.5 text-zinc-600" />}
+                      {sketch.visible ? <Eye className="w-3.5 h-3.5 text-teal-600" /> : <EyeOff className="w-3.5 h-3.5 text-slate-300" />}
                     </button>
                   </div>
                 </div>
@@ -159,37 +189,47 @@ export const FeatureTree: React.FC<FeatureTreeProps> = ({
       </div>
 
       {/* Seção 3: Histórico de Operações Tridimensionais */}
-      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-xl overflow-hidden shadow-sm">
+      <div className={`border rounded-xl overflow-hidden shadow-sm ${
+        isLight ? 'bg-white border-slate-300' : 'bg-zinc-900/80 border-zinc-800/80'
+      }`}>
         <button
           type="button"
           onClick={() => setOpenFeaturesSection(!openFeaturesSection)}
-          className="w-full px-3 py-2 flex items-center justify-between text-xs font-semibold text-zinc-200 bg-zinc-900 border-b border-zinc-800/60 hover:bg-zinc-800/50 transition cursor-pointer"
+          className={`w-full px-3 py-2 flex items-center justify-between text-xs font-semibold border-b transition cursor-pointer ${
+            isLight 
+              ? 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200' 
+              : 'bg-zinc-900 border-zinc-800/60 text-zinc-200 hover:bg-zinc-800/50'
+          }`}
         >
           <div className="flex items-center gap-2">
-            <Box className="w-3.5 h-3.5 text-sky-400" />
+            <Box className="w-3.5 h-3.5 text-sky-500" />
             <span>Operações 3D ({project.features.length})</span>
           </div>
-          {openFeaturesSection ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
+          {openFeaturesSection ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
         </button>
 
         {openFeaturesSection && (
           <div className="p-1.5 space-y-1 text-xs">
             {project.features.length === 0 ? (
-              <p className="px-3 py-2 text-[11px] text-zinc-500 italic">Nenhum recurso gerado.</p>
+              <p className="px-3 py-2 text-[11px] text-slate-400 italic">Nenhum recurso gerado.</p>
             ) : (
               project.features.map((feature, idx) => (
                 <div
                   key={feature.id}
-                  className="group px-2.5 py-1.5 rounded-lg hover:bg-zinc-800/80 flex items-center justify-between text-zinc-300 border border-transparent hover:border-zinc-700/50 transition-all"
+                  className={`group px-2.5 py-1.5 rounded-lg flex items-center justify-between border transition-all ${
+                    isLight 
+                      ? 'hover:bg-slate-100 border-transparent hover:border-slate-300 text-slate-800' 
+                      : 'hover:bg-zinc-800/80 border-transparent hover:border-zinc-700/50 text-zinc-300'
+                  }`}
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <span className="text-[10px] font-mono text-zinc-500 w-3">{idx + 1}.</span>
-                    {feature.type === 'extrude' && <Box className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />}
-                    {feature.type === 'revolve' && <RotateCw className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />}
-                    {feature.type === 'loft' && <Combine className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />}
-                    {feature.type === 'frame' && <Wrench className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />}
-                    {feature.type === 'pipe_miter' && <Scissors className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />}
-                    <span className="truncate font-medium text-zinc-200">{feature.name}</span>
+                    <span className="text-[10px] font-mono text-slate-400 w-3">{idx + 1}.</span>
+                    {feature.type === 'extrude' && <Box className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />}
+                    {feature.type === 'revolve' && <RotateCw className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />}
+                    {feature.type === 'loft' && <Combine className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />}
+                    {feature.type === 'frame' && <Wrench className="w-3.5 h-3.5 text-sky-500 flex-shrink-0" />}
+                    {feature.type === 'pipe_miter' && <Scissors className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
+                    <span className={`truncate font-bold ${isLight ? 'text-slate-900' : 'text-zinc-200'}`}>{feature.name}</span>
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -197,7 +237,7 @@ export const FeatureTree: React.FC<FeatureTreeProps> = ({
                       type="button"
                       onClick={() => onEditFeature(feature)}
                       title="Ajustar Parâmetros"
-                      className="p-1 hover:bg-zinc-700/80 text-zinc-400 hover:text-sky-300 rounded-md transition-colors cursor-pointer"
+                      className="p-1 hover:bg-slate-200 dark:hover:bg-zinc-700/80 text-slate-500 dark:text-zinc-400 hover:text-sky-600 rounded-md transition-colors cursor-pointer"
                     >
                       <Sliders className="w-3.5 h-3.5" />
                     </button>
@@ -205,15 +245,15 @@ export const FeatureTree: React.FC<FeatureTreeProps> = ({
                       type="button"
                       onClick={() => onToggleFeatureVisibility(feature.id)}
                       title="Ocultar/Exibir"
-                      className="p-1 hover:bg-zinc-700/80 text-zinc-400 hover:text-white rounded-md transition-colors cursor-pointer"
+                      className="p-1 hover:bg-slate-200 dark:hover:bg-zinc-700/80 text-slate-500 dark:text-zinc-400 rounded-md transition-colors cursor-pointer"
                     >
-                      {feature.visible ? <Eye className="w-3.5 h-3.5 text-teal-400" /> : <EyeOff className="w-3.5 h-3.5 text-zinc-600" />}
+                      {feature.visible ? <Eye className="w-3.5 h-3.5 text-teal-600" /> : <EyeOff className="w-3.5 h-3.5 text-slate-300" />}
                     </button>
                     <button
                       type="button"
                       onClick={() => onDeleteFeature(feature.id)}
                       title="Excluir Operação"
-                      className="p-1 hover:bg-zinc-700/80 text-zinc-400 hover:text-rose-400 rounded-md transition-colors cursor-pointer"
+                      className="p-1 hover:bg-slate-200 dark:hover:bg-zinc-700/80 text-slate-500 dark:text-zinc-400 hover:text-rose-500 rounded-md transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -226,17 +266,23 @@ export const FeatureTree: React.FC<FeatureTreeProps> = ({
       </div>
 
       {/* Seção 4: Estúdio de Peças e Engenharia de Materiais */}
-      <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-xl overflow-hidden shadow-sm">
+      <div className={`border rounded-xl overflow-hidden shadow-sm ${
+        isLight ? 'bg-white border-slate-300' : 'bg-zinc-900/80 border-zinc-800/80'
+      }`}>
         <button
           type="button"
           onClick={() => setOpenPartsSection(!openPartsSection)}
-          className="w-full px-3 py-2 flex items-center justify-between text-xs font-semibold text-zinc-200 bg-zinc-900 border-b border-zinc-800/60 hover:bg-zinc-800/50 transition cursor-pointer"
+          className={`w-full px-3 py-2 flex items-center justify-between text-xs font-semibold border-b transition cursor-pointer ${
+            isLight 
+              ? 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200' 
+              : 'bg-zinc-900 border-zinc-800/60 text-zinc-200 hover:bg-zinc-800/50'
+          }`}
         >
           <div className="flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+            <Sparkles className="w-3.5 h-3.5 text-teal-500" />
             <span>Peças & Materiais</span>
           </div>
-          {openPartsSection ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
+          {openPartsSection ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
         </button>
 
         {openPartsSection && (
@@ -245,18 +291,24 @@ export const FeatureTree: React.FC<FeatureTreeProps> = ({
               <div
                 key={part.id}
                 onClick={() => onSelectPartMaterial(part)}
-                className="p-2 rounded-lg bg-zinc-900/90 border border-zinc-800 hover:border-sky-500/60 cursor-pointer transition-all flex flex-col gap-1 shadow-sm"
+                className={`p-2 rounded-lg border cursor-pointer transition-all flex flex-col gap-1 shadow-sm ${
+                  isLight 
+                    ? 'bg-slate-50 border-slate-300 hover:border-sky-500 hover:bg-sky-50/50' 
+                    : 'bg-zinc-900/90 border-zinc-800 hover:border-sky-500/60'
+                }`}
               >
-                <div className="flex items-center justify-between font-bold text-sky-300">
+                <div className="flex items-center justify-between font-bold text-sky-600 dark:text-sky-300">
                   <span>{part.name}</span>
                   <span 
-                    className="w-3 h-3 rounded-md border border-zinc-700 shadow-inner" 
+                    className="w-3 h-3 rounded-md border border-slate-300 dark:border-zinc-700 shadow-inner" 
                     style={{ backgroundColor: part.color }} 
                   />
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-zinc-400 font-mono">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 font-mono">
                   <span>{part.material.name}</span>
-                  <span className="bg-zinc-800 text-teal-300 px-1.5 py-0.2 rounded-md font-bold">
+                  <span className={`px-1.5 py-0.2 rounded-md font-bold ${
+                    isLight ? 'bg-teal-100 text-teal-900' : 'bg-zinc-800 text-teal-300'
+                  }`}>
                     {part.mass}g
                   </span>
                 </div>

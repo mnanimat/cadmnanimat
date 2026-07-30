@@ -61,7 +61,7 @@ export const CFDSimulationWindow: React.FC<CFDSimulationWindowProps> = ({
   };
 
   return (
-    <div className="w-[460px] p-4 text-zinc-200 font-sans text-xs select-none space-y-4">
+    <div className="w-[460px] p-4 pb-10 text-zinc-200 font-sans text-xs select-none space-y-4">
       
       {/* CFD Status Ribbon */}
       <div className="flex items-center justify-between bg-zinc-900/90 p-3 rounded-2xl border border-sky-500/30 shadow-inner">
