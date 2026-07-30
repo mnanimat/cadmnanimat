@@ -8,6 +8,7 @@ import {
   CADFeature, 
   MeasurementResult
 } from './types/cad';
+import { UserSession, RocketConfig, VehicleConfig } from './types/engineering';
 import { CAD_TEMPLATES } from './data/cadTemplates';
 import { Toolbar } from './components/Toolbar';
 import { FeatureTree } from './components/FeatureTree';
@@ -18,10 +19,19 @@ import { MeasurementTool } from './components/MeasurementTool';
 import { ExportModal } from './components/ExportModal';
 import { BottomTabs } from './components/BottomTabs';
 import { DraggableWindow } from './components/DraggableWindow';
-import { Layers, Ruler, Sliders, Download, Maximize2, Minimize2, Move, Box } from 'lucide-react';
+import { LoginModal } from './components/LoginModal';
+import { ModeSelectorModal } from './components/ModeSelectorModal';
+import { TeamManagementModal } from './components/TeamManagementModal';
+import { Layers, Ruler, Sliders, Download, Maximize2, Minimize2, Move, Box, Users, Compass, Rocket, ShieldCheck, Sparkles } from 'lucide-react';
 
 export default function App() {
-  const [project, setProject] = useState<CADProject>(CAD_TEMPLATES[0]); // Starts with Aircraft Wing
+  // Authentication & Engineering Modes State
+  const [userSession, setUserSession] = useState<UserSession | null>(null);
+  const [showModeSelector, setShowModeSelector] = useState<boolean>(false);
+  const [showTeamManagement, setShowTeamManagement] = useState<boolean>(false);
+  const [activeEngineeringTitle, setActiveEngineeringTitle] = useState<string>('Foguete Experimental (3km Apogeu)');
+
+  const [project, setProject] = useState<CADProject>(CAD_TEMPLATES[0]); // Starts with Rocket template
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('edges');
   const [showPlanes, setShowPlanes] = useState<boolean>(true);
@@ -33,8 +43,8 @@ export default function App() {
   const [canvasMode, setCanvasMode] = useState<'fullscreen' | 'windowed' | 'minimized'>('fullscreen');
 
   // Multi-document / Part Studio tabs
-  const [tabs, setTabs] = useState<string[]>(['Asas (Estúdio 1)', 'Fuselagem', 'Conjunto Geral']);
-  const [activeTab, setActiveTab] = useState<string>('Asas (Estúdio 1)');
+  const [tabs, setTabs] = useState<string[]>(['Estúdio Principal 3D', 'Análise de Materiais & Propulsão']);
+  const [activeTab, setActiveTab] = useState<string>('Estúdio Principal 3D');
 
   // Modals & Panels State
   const [isSketching, setIsSketching] = useState<boolean>(false);
@@ -49,6 +59,38 @@ export default function App() {
 
   // Focus Z-index management
   const [focusedWindow, setFocusedWindow] = useState<string>('tree');
+
+  // Login handler
+  const handleLoginSuccess = (session: UserSession) => {
+    setUserSession(session);
+    setShowModeSelector(true); // Right after login, present the work mode selector window
+  };
+
+  // Rocket mode handler
+  const handleSelectRocketMode = (config: RocketConfig) => {
+    const rocketTemplate = CAD_TEMPLATES.find(t => t.id === 'rocket_3km') || CAD_TEMPLATES[0];
+    const customizedProject: CADProject = JSON.parse(JSON.stringify(rocketTemplate));
+    customizedProject.name = `Foguete (${config.apogeeTarget} Apogeu) - ${config.fuelType}`;
+    
+    setProject(customizedProject);
+    setActiveEngineeringTitle(`Foguete Aeroespacial (${config.apogeeTarget} Apogeu - ${config.propulsionType.toUpperCase()})`);
+    setShowModeSelector(false);
+  };
+
+  // Vehicle mode handler
+  const handleSelectVehicleMode = (config: VehicleConfig) => {
+    let templateId = 'formula_chassis';
+    if (config.domain === 'aerodesign' || config.domain === 'custom') templateId = 'airplane_wing';
+    if (config.domain === 'drone') templateId = 'drone_frame';
+
+    const tmpl = CAD_TEMPLATES.find(t => t.id === templateId) || CAD_TEMPLATES[1] || CAD_TEMPLATES[0];
+    const customizedProject: CADProject = JSON.parse(JSON.stringify(tmpl));
+    customizedProject.name = `${config.title} [${config.powertrain.toUpperCase()}]`;
+
+    setProject(customizedProject);
+    setActiveEngineeringTitle(`${config.title} (${config.powertrain})`);
+    setShowModeSelector(false);
+  };
 
   // Load Preset Template
   const handleLoadTemplate = (templateId: string) => {
@@ -144,6 +186,21 @@ export default function App() {
 
   return (
     <div className="w-screen h-screen flex flex-col bg-[#1e1e1e] font-sans text-[#cccccc] overflow-hidden select-none">
+      
+      {/* 1. INITIAL LOGIN MODAL (Terms & Privacy) */}
+      {!userSession && (
+        <LoginModal onLoginSuccess={handleLoginSuccess} />
+      )}
+
+      {/* 2. WORK MODE SELECTOR MODAL */}
+      {userSession && showModeSelector && (
+        <ModeSelectorModal
+          onSelectRocketMode={handleSelectRocketMode}
+          onSelectVehicleMode={handleSelectVehicleMode}
+          onClose={() => setShowModeSelector(false)}
+        />
+      )}
+
       {/* Top Ribbon Toolbar */}
       <Toolbar
         activeTool={activeTool}
@@ -165,6 +222,42 @@ export default function App() {
         onOpenExportModal={() => { setShowExportModal(true); setFocusedWindow('export'); }}
         onLoadTemplate={handleLoadTemplate}
       />
+
+      {/* Secondary Quick Action Bar for Engineering Mode & Team Management */}
+      {userSession && (
+        <div className="bg-zinc-950 px-4 py-1.5 border-b border-zinc-800/80 flex items-center justify-between text-xs">
+          
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowModeSelector(true)}
+              className="px-3 py-1 bg-gradient-to-r from-sky-500/20 to-teal-500/20 hover:from-sky-500/30 hover:to-teal-500/30 border border-sky-500/40 text-sky-200 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition"
+            >
+              <Compass className="w-3.5 h-3.5 text-sky-400" />
+              <span>Modo de Engenharia:</span>
+              <span className="text-white font-mono">{activeEngineeringTitle}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setShowTeamManagement(true); setFocusedWindow('team'); }}
+              className="px-3 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-teal-300 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer transition"
+            >
+              <Users className="w-3.5 h-3.5 text-teal-400" />
+              <span>Equipe, Gastos & Materiais</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 text-[11px] text-zinc-400">
+            <span className="flex items-center gap-1 bg-zinc-900 px-2.5 py-0.5 rounded-lg border border-zinc-800">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{userSession.name}</span>
+              <span className="text-zinc-500">• {userSession.organization}</span>
+            </span>
+          </div>
+
+        </div>
+      )}
 
       {/* Main Workspace Area */}
       <div className="flex-1 relative w-full h-full overflow-hidden bg-zinc-950">
@@ -220,7 +313,7 @@ export default function App() {
         {canvasMode === 'windowed' && (
           <DraggableWindow
             id="window-3d-canvas"
-            title="Visualizador CAD 3D (Asa do Avião)"
+            title={`Visualizador CAD 3D (${project.name})`}
             icon={<Box className="w-4 h-4 text-sky-400" />}
             defaultPosition={{ x: 310, y: 16 }}
             width={840}
@@ -299,7 +392,24 @@ export default function App() {
           </DraggableWindow>
         )}
 
-        {/* Movable Window 2: Measurement & Metrology Tool */}
+        {/* Movable Window 2: Team, Budget & Materials Management Tool */}
+        {showTeamManagement && (
+          <DraggableWindow
+            id="window-team-management"
+            title="Organização da Equipe, Gastos e Estoque de Materiais"
+            icon={<Users className="w-4 h-4 text-teal-400" />}
+            defaultPosition={{ x: Math.max(20, Math.floor(window.innerWidth / 2) - 320), y: 30 }}
+            width={680}
+            height={520}
+            zIndex={focusedWindow === 'team' ? 35 : 20}
+            onFocus={() => setFocusedWindow('team')}
+            onClose={() => setShowTeamManagement(false)}
+          >
+            <TeamManagementModal onClose={() => setShowTeamManagement(false)} />
+          </DraggableWindow>
+        )}
+
+        {/* Movable Window 3: Measurement & Metrology Tool */}
         {activeTool === 'measure' && (
           <DraggableWindow
             id="window-measurement"
@@ -317,7 +427,7 @@ export default function App() {
           </DraggableWindow>
         )}
 
-        {/* Movable Window 3: Parametric Property Inspector */}
+        {/* Movable Window 4: Parametric Property Inspector */}
         {propertyModalType && (
           <DraggableWindow
             id="window-property-panel"
@@ -338,7 +448,7 @@ export default function App() {
           </DraggableWindow>
         )}
 
-        {/* Movable Window 4: Export Center */}
+        {/* Movable Window 5: Export Center */}
         {showExportModal && (
           <DraggableWindow
             id="window-export"
@@ -388,4 +498,5 @@ export default function App() {
     </div>
   );
 }
+
 

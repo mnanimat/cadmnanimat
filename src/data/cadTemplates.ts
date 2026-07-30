@@ -2,6 +2,194 @@ import { CADProject } from '../types/cad';
 
 export const CAD_TEMPLATES: CADProject[] = [
   {
+    id: 'rocket_3km',
+    name: 'Foguete Experimental (Apogeu 3km) & Motor Sustentável',
+    description: 'Foguete de sondagem de alta performance com coifa ogival, tubo em fibra de carbono, aletas 4x e câmara de combustão de motor híbrido.',
+    activePlane: 'Front',
+    sketches: [
+      {
+        id: 'sk_rocket_nose',
+        name: 'Sketch 1 - Coifa Ogival & Módulo de Carga Útil',
+        plane: 'Front',
+        planeOffset: 350,
+        visible: true,
+        suppressed: false,
+        elements: [
+          {
+            id: 'e_nose_circle',
+            kind: 'circle',
+            points: [{ x: 0, y: 0 }],
+            radius: 50
+          }
+        ]
+      },
+      {
+        id: 'sk_rocket_body',
+        name: 'Sketch 2 - Tubo de Corpo & Seção do Motor',
+        plane: 'Front',
+        planeOffset: 0,
+        visible: true,
+        suppressed: false,
+        elements: [
+          {
+            id: 'e_body_outer',
+            kind: 'circle',
+            points: [{ x: 0, y: 0 }],
+            radius: 65
+          },
+          {
+            id: 'e_body_inner',
+            kind: 'circle',
+            points: [{ x: 0, y: 0 }],
+            radius: 58
+          }
+        ]
+      },
+      {
+        id: 'sk_rocket_fins',
+        name: 'Sketch 3 - Conjunto de Aletas Aerodinâmicas 4x',
+        plane: 'Top',
+        planeOffset: -200,
+        visible: true,
+        suppressed: false,
+        elements: [
+          {
+            id: 'e_fin_polygon',
+            kind: 'polygon',
+            points: [{ x: 0, y: 0 }],
+            radius: 130,
+            sides: 4
+          }
+        ]
+      },
+      {
+        id: 'sk_rocket_nozzle',
+        name: 'Sketch 4 - Bocal De Laval De Entrada/Saída Supersônica',
+        plane: 'Front',
+        planeOffset: -380,
+        visible: true,
+        suppressed: false,
+        elements: [
+          {
+            id: 'e_nozzle_circle',
+            kind: 'circle',
+            points: [{ x: 0, y: 0 }],
+            radius: 42
+          },
+          {
+            id: 'e_throat_circle',
+            kind: 'circle',
+            points: [{ x: 0, y: 0 }],
+            radius: 18
+          }
+        ]
+      }
+    ],
+    features: [
+      {
+        id: 'f_body_extrude',
+        name: 'Extrusão 1 - Estrutura Principal do Foguete (Fusolagem)',
+        type: 'extrude',
+        sketchId: 'sk_rocket_body',
+        params: { sketchId: 'sk_rocket_body', depth: 600, symmetric: true, operation: 'add' },
+        visible: true,
+        suppressed: false,
+        materialId: 'carbon_fiber',
+        color: '#0ea5e9'
+      },
+      {
+        id: 'f_fins_extrude',
+        name: 'Extrusão 2 - Aletas de Estabilização 4x',
+        type: 'extrude',
+        sketchId: 'sk_rocket_fins',
+        params: { sketchId: 'sk_rocket_fins', depth: 12, symmetric: true, operation: 'add' },
+        visible: true,
+        suppressed: false,
+        materialId: 'al_7075',
+        color: '#f59e0b'
+      },
+      {
+        id: 'f_nozzle_revolve',
+        name: 'Revolução 1 - Bocal De Laval em Alumínio Aeroespacial',
+        type: 'revolve',
+        sketchId: 'sk_rocket_nozzle',
+        params: { sketchId: 'sk_rocket_nozzle', angle: 360, axis: 'z', operation: 'add' },
+        visible: true,
+        suppressed: false,
+        materialId: 'al_7075',
+        color: '#14b8a6'
+      }
+    ],
+    parts: [
+      {
+        id: 'part_rocket_assembly',
+        name: 'Conjunto Foguete Apogeu 3km',
+        featureIds: ['f_body_extrude', 'f_fins_extrude', 'f_nozzle_revolve'],
+        material: { id: 'carbon_fiber', name: 'Fibra de Carbono & Alumínio 7075', density: 1.85, color: '#0ea5e9', metalness: 0.7, roughness: 0.3 },
+        visible: true,
+        color: '#0ea5e9',
+        volume: 2450.0,
+        mass: 4532.5,
+        surfaceArea: 5800.0
+      }
+    ]
+  },
+  {
+    id: 'formula_chassis',
+    name: 'Fórmula SAE (Elétrico / H2O / Autônomo)',
+    description: 'Monocoque tubular de alto rendimento, suporte de bateria / célula H2O e pacote aerodinâmico.',
+    activePlane: 'Top',
+    sketches: [
+      {
+        id: 'sk_chassis_frame',
+        name: 'Sketch 1 - Perfil da Célula de Sobrevivência',
+        plane: 'Top',
+        planeOffset: 0,
+        visible: true,
+        suppressed: false,
+        elements: [
+          {
+            id: 'e_chassis_rect',
+            kind: 'rect',
+            points: [{ x: -80, y: -220 }, { x: 80, y: 220 }]
+          },
+          {
+            id: 'e_cockpit_circle',
+            kind: 'circle',
+            points: [{ x: 0, y: 30 }],
+            radius: 45
+          }
+        ]
+      }
+    ],
+    features: [
+      {
+        id: 'f_chassis_extrude',
+        name: 'Extrusão 1 - Estrutura Monocoque SAE',
+        type: 'extrude',
+        sketchId: 'sk_chassis_frame',
+        params: { sketchId: 'sk_chassis_frame', depth: 85, symmetric: true, operation: 'add' },
+        visible: true,
+        suppressed: false,
+        materialId: 'carbon_fiber',
+        color: '#14b8a6'
+      }
+    ],
+    parts: [
+      {
+        id: 'part_formula',
+        name: 'Monocoque Fórmula SAE',
+        featureIds: ['f_chassis_extrude'],
+        material: { id: 'carbon_fiber', name: 'Fibra de Carbono Monocoque', density: 1.55, color: '#14b8a6', metalness: 0.6, roughness: 0.4 },
+        visible: true,
+        color: '#14b8a6',
+        volume: 1850.0,
+        mass: 2867.0,
+        surfaceArea: 4200.0
+      }
+    ]
+  },
+  {
     id: 'airplane_wing',
     name: 'Asa de Avião - Perfis NACA',
     description: 'Estrutura aeronáutica completa com nervuras, longarinas e perfil aerodinâmico NACA 2412.',
