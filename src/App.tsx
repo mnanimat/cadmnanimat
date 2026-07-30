@@ -6,8 +6,10 @@ import {
   PlaneType, 
   Sketch2D, 
   CADFeature, 
+  CADPart,
   MeasurementResult,
-  Point3D
+  Point3D,
+  CFDConfig
 } from './types/cad';
 import { UserSession, RocketConfig, VehicleConfig } from './types/engineering';
 import { CAD_TEMPLATES } from './data/cadTemplates';
@@ -18,12 +20,14 @@ import { SketchCanvas } from './components/SketchCanvas';
 import { PropertyPanel } from './components/PropertyPanel';
 import { MeasurementTool } from './components/MeasurementTool';
 import { ExportModal } from './components/ExportModal';
+import { CFDSimulationWindow } from './components/CFDSimulationWindow';
+import { PartsLibraryModal } from './components/PartsLibraryModal';
 import { BottomTabs } from './components/BottomTabs';
 import { DraggableWindow } from './components/DraggableWindow';
 import { LoginModal } from './components/LoginModal';
 import { ModeSelectorModal } from './components/ModeSelectorModal';
 import { TeamManagementModal } from './components/TeamManagementModal';
-import { Layers, Ruler, Sliders, Download, Maximize2, Minimize2, Move, Box, Users, Compass, Rocket, ShieldCheck, Sparkles } from 'lucide-react';
+import { Layers, Ruler, Sliders, Download, Maximize2, Minimize2, Move, Box, Users, Compass, Rocket, ShieldCheck, Sparkles, Wind, Database } from 'lucide-react';
 
 export default function App() {
   // Authentication & Engineering Modes State
@@ -76,8 +80,35 @@ export default function App() {
   };
 
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
+  const [showCFDModal, setShowCFDModal] = useState<boolean>(false);
+  const [showPartsLibraryModal, setShowPartsLibraryModal] = useState<boolean>(false);
   const [measurementResult, setMeasurementResult] = useState<MeasurementResult | null>(null);
   const [showFeatureTree, setShowFeatureTree] = useState<boolean>(true);
+
+  // CFD Aerodynamic Simulation Config
+  const [cfdConfig, setCfdConfig] = useState<CFDConfig>({
+    enabled: false,
+    windSpeedMs: 35,
+    airDensity: 1.225,
+    angleOfAttackDeg: 4,
+    temperatureC: 15,
+    turbulenceModel: 'k_epsilon',
+    showStreamlines: true,
+    showPressureMap: true,
+    showVectorGrid: false,
+    showSlicePlane: false,
+    streamlineParticlesCount: 220,
+    windDirection: 'z_neg'
+  });
+
+  const handleImportStandardPart = (sketch: Sketch2D, feature: CADFeature, part: CADPart) => {
+    setProject(prev => ({
+      ...prev,
+      sketches: [...prev.sketches, sketch],
+      features: [...prev.features, feature],
+      parts: [...prev.parts, part]
+    }));
+  };
 
   // Focus Z-index management
   const [focusedWindow, setFocusedWindow] = useState<string>('tree');
@@ -244,6 +275,8 @@ export default function App() {
         onOpenFrameModal={() => { setEditingFeature(null); setPropertyModalType('frame'); setFocusedWindow('property'); }}
         onOpenPipeMiterModal={() => { setEditingFeature(null); setPropertyModalType('pipe_miter'); setFocusedWindow('property'); }}
         onOpenExportModal={() => { setShowExportModal(true); setFocusedWindow('export'); }}
+        onOpenCFDModal={() => { setShowCFDModal(true); setFocusedWindow('cfd'); }}
+        onOpenPartsLibraryModal={() => { setShowPartsLibraryModal(true); setFocusedWindow('parts'); }}
         onLoadTemplate={handleLoadTemplate}
       />
 
@@ -302,6 +335,7 @@ export default function App() {
               activePlane={activePlane}
               activeTool={activeTool}
               selectedFeatureId={selectedFeatureId}
+              cfdConfig={cfdConfig}
               onSelectPlane={setActivePlane}
               onSelectFeature={(id) => setSelectedFeatureId(id)}
               onUpdateFeatureTransform={handleUpdateFeatureTransform}
@@ -524,6 +558,44 @@ export default function App() {
             <ExportModal
               project={project}
               onClose={() => setShowExportModal(false)}
+            />
+          </DraggableWindow>
+        )}
+
+        {/* Movable Window 6: Aerodynamic CFD Simulation Window */}
+        {showCFDModal && (
+          <DraggableWindow
+            id="window-cfd"
+            title="Simulação Aerodinâmica CFD & Túnel de Vento 3D"
+            icon={<Wind className="w-4 h-4 text-sky-400 animate-pulse" />}
+            defaultPosition={{ x: Math.max(20, Math.floor(window.innerWidth / 2) - 340), y: 30 }}
+            zIndex={focusedWindow === 'cfd' ? 30 : 20}
+            onFocus={() => setFocusedWindow('cfd')}
+            onClose={() => setShowCFDModal(false)}
+          >
+            <CFDSimulationWindow
+              project={project}
+              cfdConfig={cfdConfig}
+              onUpdateCFDConfig={(newConfig) => setCfdConfig(newConfig)}
+              onClose={() => setShowCFDModal(false)}
+            />
+          </DraggableWindow>
+        )}
+
+        {/* Movable Window 7: Standard Parts Catalog (ISO / ANSI) */}
+        {showPartsLibraryModal && (
+          <DraggableWindow
+            id="window-parts-library"
+            title="Biblioteca de Peças Padrão Industrial (ISO / ANSI)"
+            icon={<Database className="w-4 h-4 text-amber-400" />}
+            defaultPosition={{ x: Math.max(20, Math.floor(window.innerWidth / 2) - 340), y: 50 }}
+            zIndex={focusedWindow === 'parts' ? 30 : 20}
+            onFocus={() => setFocusedWindow('parts')}
+            onClose={() => setShowPartsLibraryModal(false)}
+          >
+            <PartsLibraryModal
+              onImportPart={handleImportStandardPart}
+              onClose={() => setShowPartsLibraryModal(false)}
             />
           </DraggableWindow>
         )}

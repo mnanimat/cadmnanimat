@@ -179,3 +179,57 @@ export interface MeasurementResult {
   area?: number;
   volume?: number;
 }
+
+export interface CFDConfig {
+  enabled: boolean;
+  windSpeedMs: number;       // Air speed in m/s (e.g., 30 m/s = 108 km/h)
+  airDensity: number;        // Fluid density in kg/m^3 (e.g. 1.225 kg/m^3)
+  angleOfAttackDeg: number;  // Angle of attack in degrees (-15 to +25)
+  temperatureC: number;      // Air temperature in Celsius (e.g. 15 C)
+  turbulenceModel: 'laminar' | 'k_epsilon' | 'spalart_allmaras' | 'navier_stokes_3d';
+  showStreamlines: boolean;  // Animated particle streamlines in viewport
+  showPressureMap: boolean;  // Mesh color heatmap (Stagnation vs Suction)
+  showVectorGrid: boolean;   // 3D velocity vector arrows grid
+  showSlicePlane: boolean;   // YZ cut plane slice contour
+  streamlineParticlesCount: number; // e.g., 200
+  windDirection: 'x_pos' | 'x_neg' | 'z_pos' | 'z_neg';
+}
+
+export interface CFDResult {
+  liftForceN: number;        // Lift Force in Newtons
+  dragForceN: number;        // Drag Force in Newtons
+  downforceN: number;        // Downforce in Newtons
+  cl: number;                // Lift Coefficient C_L
+  cd: number;                // Drag Coefficient C_D
+  efficiencyLD: number;      // L/D Ratio (Efficiency)
+  maxStagnationPressurePa: number; // Max pressure in Pascals (1/2 * rho * v^2)
+  minPressurePa: number;     // Min suction pressure in Pascals
+  reynoldsNumber: number;    // Reynolds number Re
+  machNumber: number;        // Mach number
+  flowType: string;          // e.g. "Subsônico Laminar-Turbulento"
+}
+
+export type StandardPartType = 
+  | 'bolt_hex'       // Parafuso Sextavado ISO 4017 / DIN 933
+  | 'bolt_allen'     // Parafuso Allen ISO 4762 / DIN 912
+  | 'bolt_flat'      // Parafuso Cabeça Chata ISO 10642
+  | 'nut_hex'        // Porca Sextavada ISO 4032
+  | 'nut_nylon'      // Porca Auto-travante DIN 985
+  | 'bearing_ball'   // Rolamento Rígido de Esfera SKF 6200
+  | 'pillow_block'   // Mancal Pedestal Pillow Block UCP204
+  | 'washer_flat'    // Arruela Lisa ISO 7089
+  | 'profile_i'      // Perfil I / W Beam ISO 1025
+  | 'profile_angle'; // Cantoneira L
+
+export interface StandardPartSpec {
+  id: string;
+  type: StandardPartType;
+  category: 'Parafusos' | 'Porcas' | 'Rolamentos' | 'Arruelas' | 'Perfis';
+  norm: string;       // e.g., 'ISO 4017 / DIN 933'
+  name: string;       // e.g., 'Parafuso Sextavado M8x30'
+  nominalSize: string; // e.g., 'M8', 'M10', '6204', 'UCP204', 'W100x50'
+  lengthMm: number;   // e.g., 30mm
+  threadPitch?: number; // e.g. 1.25mm
+  materialId: string;
+  weightGrams: number;
+}

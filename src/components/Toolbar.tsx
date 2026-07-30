@@ -16,7 +16,9 @@ import {
   Maximize,
   Pipette,
   Wrench,
-  Shield
+  Shield,
+  Wind,
+  Database
 } from 'lucide-react';
 import { ActiveTool, DisplayMode, PlaneType } from '../types/cad';
 
@@ -40,6 +42,8 @@ interface ToolbarProps {
   onOpenFrameModal: () => void;
   onOpenPipeMiterModal: () => void;
   onOpenExportModal: () => void;
+  onOpenCFDModal?: () => void;
+  onOpenPartsLibraryModal?: () => void;
   onLoadTemplate: (templateId: string) => void;
 }
 
@@ -63,6 +67,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenFrameModal,
   onOpenPipeMiterModal,
   onOpenExportModal,
+  onOpenCFDModal,
+  onOpenPartsLibraryModal,
   onLoadTemplate
 }) => {
   return (
@@ -253,6 +259,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           >
             <Combine className="w-3.5 h-3.5 text-purple-400" />
             <span>Loft</span>
+          </button>
+        </div>
+
+        {/* Agrupamento 3.5: CFD Aerodinâmica & Biblioteca de Peças ISO */}
+        <div className="flex items-center bg-zinc-950/80 border border-zinc-800 p-1 rounded-xl gap-1 shadow-inner">
+          <button
+            onClick={onOpenCFDModal}
+            className="px-3 py-1.5 bg-gradient-to-r from-sky-500/20 to-teal-500/20 hover:from-sky-500/30 hover:to-teal-500/30 border border-sky-400/50 text-sky-300 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all duration-200 active:scale-95 shadow-sm"
+            title="Abrir Janela de Simulação Aerodinâmica e Túnel de Vento CFD 3D"
+          >
+            <Wind className="w-3.5 h-3.5 text-sky-400 animate-pulse" />
+            <span>Simulação CFD</span>
+          </button>
+
+          <button
+            onClick={onOpenPartsLibraryModal}
+            className="px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-400/50 text-amber-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all duration-200 active:scale-95 shadow-sm"
+            title="Biblioteca de Peças Padrão Industrial (Parafusos, Porcas, Rolamentos ISO/DIN)"
+          >
+            <Database className="w-3.5 h-3.5 text-amber-400" />
+            <span>Biblioteca ISO/ANSI</span>
           </button>
         </div>
 

@@ -7,7 +7,8 @@ import {
   PlaneType, 
   Point3D, 
   MeasurementResult,
-  ActiveTool 
+  ActiveTool,
+  CFDConfig
 } from '../types/cad';
 import { buildFeatureMesh } from '../utils/cadKernel';
 import { ViewCube } from './ViewCube';
@@ -21,6 +22,7 @@ interface CADViewportProps {
   activePlane: PlaneType;
   activeTool: ActiveTool;
   selectedFeatureId?: string;
+  cfdConfig?: CFDConfig;
   onSelectPlane: (plane: PlaneType) => void;
   onSelectFeature?: (featureId: string) => void;
   onUpdateFeatureTransform?: (featureId: string, transform: { position?: Point3D; rotation?: Point3D; scale?: Point3D }) => void;
@@ -37,6 +39,7 @@ export const CADViewport: React.FC<CADViewportProps> = ({
   activePlane,
   activeTool,
   selectedFeatureId,
+  cfdConfig,
   onSelectPlane,
   onSelectFeature,
   onUpdateFeatureTransform,
@@ -51,6 +54,14 @@ export const CADViewport: React.FC<CADViewportProps> = ({
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const modelGroupRef = useRef<THREE.Group | null>(null);
   const planesGroupRef = useRef<THREE.Group | null>(null);
+  const cfdGroupRef = useRef<THREE.Group | null>(null);
+  const cfdParticlesRef = useRef<THREE.Points | null>(null);
+  const cfdConfigRef = useRef<CFDConfig | undefined>(cfdConfig);
+  const modelBBoxRef = useRef<THREE.Box3>(new THREE.Box3());
+
+  useEffect(() => {
+    cfdConfigRef.current = cfdConfig;
+  }, [cfdConfig]);
 
   const [activeViewName, setActiveViewName] = useState<string>('Isometric');
   const [measurePoints, setMeasurePoints] = useState<Point3D[]>([]);
@@ -163,10 +174,48 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     scene.add(planesGroup);
     planesGroupRef.current = planesGroup;
 
+    // CFD Streamlines & Visualizers Group container
+    const cfdGroup = new THREE.Group();
+    cfdGroup.name = 'CAD_CFD_GROUP';
+    scene.add(cfdGroup);
+    cfdGroupRef.current = cfdGroup;
+
     // Render loop
     let animationFrameId: number;
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
+
+      // Animate CFD particle streamlines if enabled
+      if (cfdParticlesRef.current && cfdConfigRef.current?.enabled && cfdConfigRef.current?.showStreamlines) {
+        const posAttr = cfdParticlesRef.current.geometry.attributes.position;
+        const positions = posAttr.array as Float32Array;
+        const count = positions.length / 3;
+        const speed = (cfdConfigRef.current.windSpeedMs || 30) * 0.12;
+
+        for (let i = 0; i < count; i++) {
+          const idx = i * 3;
+          // Flow from +Z towards -Z
+          positions[idx + 2] -= speed;
+
+          // Simple obstacle avoidance / flow deflection around model bbox
+          const bbox = modelBBoxRef.current;
+          if (bbox && positions[idx + 2] > bbox.min.z && positions[idx + 2] < bbox.max.z) {
+            const dx = positions[idx] - (bbox.min.x + bbox.max.x) / 2;
+            const dy = positions[idx + 1] - (bbox.min.y + bbox.max.y) / 2;
+            positions[idx] += dx >= 0 ? 0.6 : -0.6;
+            positions[idx + 1] += dy >= 0 ? 0.4 : -0.4;
+          }
+
+          // Reset particle when out of wind tunnel bounds
+          if (positions[idx + 2] < -350) {
+            positions[idx] = (Math.random() - 0.5) * 320;
+            positions[idx + 1] = (Math.random() - 0.5) * 220 + 20;
+            positions[idx + 2] = 350;
+          }
+        }
+        posAttr.needsUpdate = true;
+      }
+
       controls.update();
       renderer.render(scene, camera);
     };
@@ -320,12 +369,111 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     // Auto-center camera target on model bounding box if geometries exist
     if (group.children.length > 0 && controlsRef.current && !selectedFeatureId) {
       const bbox = new THREE.Box3().setFromObject(group);
+      modelBBoxRef.current.copy(bbox);
       const center = new THREE.Vector3();
       bbox.getCenter(center);
       controlsRef.current.target.copy(center);
       controlsRef.current.update();
     }
   }, [project, selectedFeatureId]);
+
+  // CFD Visualizers (Particles Streamlines, Pressure Heatmaps, Vector Field, Cut Planes)
+  useEffect(() => {
+    if (!cfdGroupRef.current) return;
+    const cfdGroup = cfdGroupRef.current;
+
+    while (cfdGroup.children.length > 0) {
+      cfdGroup.remove(cfdGroup.children[0]);
+    }
+    cfdParticlesRef.current = null;
+
+    if (!cfdConfig || !cfdConfig.enabled) return;
+
+    // 1. STREAMLINES PARTICLE SYSTEM
+    if (cfdConfig.showStreamlines) {
+      const pCount = cfdConfig.streamlineParticlesCount || 250;
+      const positions = new Float32Array(pCount * 3);
+      const colors = new Float32Array(pCount * 3);
+
+      for (let i = 0; i < pCount; i++) {
+        const idx = i * 3;
+        positions[idx] = (Math.random() - 0.5) * 320;
+        positions[idx + 1] = (Math.random() - 0.5) * 220 + 20;
+        positions[idx + 2] = (Math.random() - 0.5) * 700;
+
+        // Particle colors based on velocity magnitude (Cyan to Magenta)
+        const col = new THREE.Color();
+        col.setHSL(0.55 - (i % 10) * 0.03, 0.9, 0.6);
+        colors[idx] = col.r;
+        colors[idx + 1] = col.g;
+        colors[idx + 2] = col.b;
+      }
+
+      const pGeom = new THREE.BufferGeometry();
+      pGeom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      pGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const pMat = new THREE.PointsMaterial({
+        size: 3.5,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending
+      });
+
+      const particles = new THREE.Points(pGeom, pMat);
+      cfdParticlesRef.current = particles;
+      cfdGroup.add(particles);
+    }
+
+    // 2. PRESSURE HEATMAP ON MODEL MESHES
+    if (cfdConfig.showPressureMap && modelGroupRef.current) {
+      modelGroupRef.current.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          const mat = child.material as THREE.MeshStandardMaterial;
+          mat.color = new THREE.Color('#0284c7'); // High velocity blue base
+          mat.emissive = new THREE.Color('#f43f5e'); // Stagnation pressure red highlight
+          mat.emissiveIntensity = 0.45;
+        }
+      });
+    }
+
+    // 3. 3D VECTOR FIELD GRID
+    if (cfdConfig.showVectorGrid) {
+      const gridGroup = new THREE.Group();
+      const rows = 4;
+      const cols = 4;
+      const layers = 3;
+      const dir = new THREE.Vector3(0, 0, -1);
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          for (let l = 0; l < layers; l++) {
+            const origin = new THREE.Vector3((c - 1.5) * 70, (r - 1) * 60 + 20, (l - 1) * 140);
+            const arrow = new THREE.ArrowHelper(dir, origin, 28, 0x38bdf8, 7, 4);
+            gridGroup.add(arrow);
+          }
+        }
+      }
+      cfdGroup.add(gridGroup);
+    }
+
+    // 4. CUT PLANE YZ CONTOUR
+    if (cfdConfig.showSlicePlane) {
+      const planeGeom = new THREE.PlaneGeometry(350, 250);
+      const planeMat = new THREE.MeshBasicMaterial({
+        color: 0xa855f7,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.25,
+        wireframe: true
+      });
+      const slicePlane = new THREE.Mesh(planeGeom, planeMat);
+      slicePlane.position.set(0, 50, 0);
+      cfdGroup.add(slicePlane);
+    }
+
+  }, [cfdConfig, project]);
 
   // Handle Display Modes (Shaded, Wireframe, X-Ray)
   useEffect(() => {
