@@ -24,6 +24,8 @@ import { ExportModal } from './components/ExportModal';
 import { CFDSimulationWindow } from './components/CFDSimulationWindow';
 import { PartsLibraryModal } from './components/PartsLibraryModal';
 import { DrawingSheetModal } from './components/DrawingSheetModal';
+import { FEASimulationModal } from './components/FEASimulationModal';
+import { MassInertiaModal } from './components/MassInertiaModal';
 import { BottomTabs } from './components/BottomTabs';
 import { DraggableWindow } from './components/DraggableWindow';
 import { LoginModal } from './components/LoginModal';
@@ -215,16 +217,18 @@ export default function App() {
       } else if ((e.ctrlKey || e.metaKey) && key === 's') {
         e.preventDefault();
         setShowExportModal(true);
-      } else if (key === 'g' || key === 'm' || key === 'w') {
-        setActiveTool('translate');
-      } else if (key === 'r' || key === 'e') {
-        setActiveTool('rotate');
-      } else if (key === 's') {
-        setActiveTool('scale');
-      } else if (key === 'v') {
-        setActiveTool('select');
-      } else if (key === 'p' || key === 'q') {
-        setActiveTool('measure');
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (key === 'g' || key === 'm' || key === 'w') {
+          setActiveTool('translate');
+        } else if (key === 'r' || key === 'e') {
+          setActiveTool('rotate');
+        } else if (key === 's') {
+          setActiveTool('scale');
+        } else if (key === 'v') {
+          setActiveTool('select');
+        } else if (key === 'p' || key === 'q') {
+          setActiveTool('measure');
+        }
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedFeatureId) {
           const updated = {
@@ -294,6 +298,8 @@ export default function App() {
 
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [showCFDModal, setShowCFDModal] = useState<boolean>(false);
+  const [showFEAModal, setShowFEAModal] = useState<boolean>(false);
+  const [showMassInertiaModal, setShowMassInertiaModal] = useState<boolean>(false);
   const [showPartsLibraryModal, setShowPartsLibraryModal] = useState<boolean>(false);
   const [measurementResult, setMeasurementResult] = useState<MeasurementResult | null>(null);
   const [showFeatureTree, setShowFeatureTree] = useState<boolean>(true);
@@ -475,6 +481,8 @@ export default function App() {
         onOpenPipeMiterModal={() => { setEditingFeature(null); setPropertyModalType('pipe_miter'); setFocusedWindow('property'); }}
         onOpenExportModal={() => { setShowExportModal(true); setFocusedWindow('export'); }}
         onOpenCFDModal={() => { setShowCFDModal(true); setFocusedWindow('cfd'); }}
+        onOpenFEAModal={() => { setShowFEAModal(true); setFocusedWindow('fea'); }}
+        onOpenMassInertiaModal={() => { setShowMassInertiaModal(true); setFocusedWindow('mass'); }}
         onOpenPartsLibraryModal={() => { setShowPartsLibraryModal(true); setFocusedWindow('parts'); }}
         onLoadTemplate={handleLoadTemplate}
         onUndo={handleUndo}
@@ -814,6 +822,48 @@ export default function App() {
             <DrawingSheetModal
               project={project}
               onClose={() => setShowDrawingSheetModal(false)}
+              theme={theme}
+            />
+          </DraggableWindow>
+        )}
+
+        {/* Movable Window 10: Structural FEA Simulation Modal */}
+        {showFEAModal && (
+          <DraggableWindow
+            id="window-fea"
+            title="Análise Tensional por Elementos Finitos (FEA 3D)"
+            icon={<ShieldCheck className="w-4 h-4 text-rose-400" />}
+            defaultPosition={{ x: Math.max(10, Math.floor(window.innerWidth / 2) - 310), y: 40 }}
+            width={640}
+            zIndex={focusedWindow === 'fea' ? 36 : 25}
+            onFocus={() => setFocusedWindow('fea')}
+            onClose={() => setShowFEAModal(false)}
+            theme={theme}
+          >
+            <FEASimulationModal
+              project={project}
+              onClose={() => setShowFEAModal(false)}
+              theme={theme}
+            />
+          </DraggableWindow>
+        )}
+
+        {/* Movable Window 11: Mass Properties & Center of Gravity Modal */}
+        {showMassInertiaModal && (
+          <DraggableWindow
+            id="window-mass"
+            title="Propriedades de Massa & Centro de Gravidade (CoG)"
+            icon={<Box className="w-4 h-4 text-purple-400" />}
+            defaultPosition={{ x: Math.max(10, Math.floor(window.innerWidth / 2) - 270), y: 60 }}
+            width={550}
+            zIndex={focusedWindow === 'mass' ? 37 : 26}
+            onFocus={() => setFocusedWindow('mass')}
+            onClose={() => setShowMassInertiaModal(false)}
+            theme={theme}
+          >
+            <MassInertiaModal
+              project={project}
+              onClose={() => setShowMassInertiaModal(false)}
               theme={theme}
             />
           </DraggableWindow>

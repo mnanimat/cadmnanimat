@@ -64,6 +64,8 @@ interface ToolbarProps {
   onOpenPipeMiterModal: () => void;
   onOpenExportModal: () => void;
   onOpenCFDModal?: () => void;
+  onOpenFEAModal?: () => void;
+  onOpenMassInertiaModal?: () => void;
   onOpenPartsLibraryModal?: () => void;
   onLoadTemplate: (templateId: string) => void;
   onUndo?: () => void;
@@ -107,6 +109,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenPipeMiterModal,
   onOpenExportModal,
   onOpenCFDModal,
+  onOpenFEAModal,
+  onOpenMassInertiaModal,
   onOpenPartsLibraryModal,
   onLoadTemplate,
   onUndo,
@@ -568,6 +572,26 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   >
                     <Wind className="w-3.5 h-3.5 text-sky-500" />
                     <span>Simulação Aerodinâmica CFD</span>
+                  </button>
+
+                  <button
+                    onClick={() => { onOpenFEAModal?.(); setActiveMenu(null); }}
+                    className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 cursor-pointer ${
+                      isLight ? 'hover:bg-slate-100 text-slate-800' : 'hover:bg-zinc-800 text-zinc-200'
+                    }`}
+                  >
+                    <Shield className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Análise Tensional FEA (Elementos Finitos)</span>
+                  </button>
+
+                  <button
+                    onClick={() => { onOpenMassInertiaModal?.(); setActiveMenu(null); }}
+                    className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 cursor-pointer ${
+                      isLight ? 'hover:bg-slate-100 text-slate-800' : 'hover:bg-zinc-800 text-zinc-200'
+                    }`}
+                  >
+                    <Wrench className="w-3.5 h-3.5 text-purple-500" />
+                    <span>Propriedades de Massa & Centro CoG</span>
                   </button>
 
                   <button

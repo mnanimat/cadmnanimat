@@ -63,6 +63,7 @@ export const CADViewport: React.FC<CADViewportProps> = ({
   const measureGroupRef = useRef<THREE.Group | null>(null);
   const cfdConfigRef = useRef<CFDConfig | undefined>(cfdConfig);
   const modelBBoxRef = useRef<THREE.Box3>(new THREE.Box3());
+  const isDraggingGizmoRef = useRef<boolean>(false);
 
   useEffect(() => {
     cfdConfigRef.current = cfdConfig;
@@ -133,6 +134,7 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     tControls.size = 0.85;
     tControls.addEventListener('dragging-changed', (event: any) => {
       controls.enabled = !event.value;
+      isDraggingGizmoRef.current = !!event.value;
     });
 
     tControls.addEventListener('objectChange', () => {
@@ -267,6 +269,8 @@ export const CADViewport: React.FC<CADViewportProps> = ({
   // Sync Transform Gizmo mode & target object in any mode
   useEffect(() => {
     if (!transformControlsRef.current || !modelGroupRef.current) return;
+    if (isDraggingGizmoRef.current) return;
+
     const tControls = transformControlsRef.current;
 
     const isTransformTool = activeTool === 'translate' || activeTool === 'rotate' || activeTool === 'scale';
@@ -301,7 +305,9 @@ export const CADViewport: React.FC<CADViewportProps> = ({
     }
 
     if (targetMesh && (targetMesh as THREE.Object3D).parent && isTransformTool) {
-      tControls.attach(targetMesh);
+      if (tControls.object !== targetMesh) {
+        tControls.attach(targetMesh);
+      }
     } else {
       tControls.detach();
     }
@@ -374,6 +380,8 @@ export const CADViewport: React.FC<CADViewportProps> = ({
   // Rebuild 3D CAD Geometries when project changes
   useEffect(() => {
     if (!modelGroupRef.current) return;
+    if (isDraggingGizmoRef.current) return;
+
     const group = modelGroupRef.current;
 
     if (transformControlsRef.current) {
